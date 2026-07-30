@@ -31,6 +31,11 @@ export function SettingsScreen({ open, onClose }) {
     if (!open) setPage(null);
   }, [open]);
 
+  // Leaving the Local Data page shouldn't leave the confirm step armed for next time.
+  useEffect(() => {
+    if (page !== 'local-data') setConfirmClear(false);
+  }, [page]);
+
   const profile = getProfile();
   const feedCount = listFeeds().length;
   const appearance = getAppearance();
@@ -41,18 +46,28 @@ export function SettingsScreen({ open, onClose }) {
     <>
       <Sheet open={open} onClose={onClose} title="Settings">
         <div className="pb-10">
-          <SectionHeader>Setup</SectionHeader>
+          <SectionHeader>Appearance</SectionHeader>
           <ListGroup>
             <Row
               title="Appearance"
               subtitle={`${themeName} · ${MODES.find((m) => m.id === appearance.mode)?.name}`}
               onClick={() => setPage('appearance')}
+              last
             />
+          </ListGroup>
+
+          <SectionHeader>Calendars</SectionHeader>
+          <ListGroup>
             <Row
               title="Calendars"
               subtitle={feedCount ? `${feedCount} connected` : 'Not connected'}
               onClick={() => setPage('calendars')}
+              last
             />
+          </ListGroup>
+
+          <SectionHeader>Preferences</SectionHeader>
+          <ListGroup>
             <Row
               title="Preferences"
               subtitle={
@@ -67,42 +82,13 @@ export function SettingsScreen({ open, onClose }) {
 
           <SectionHeader>Local Data</SectionHeader>
           <ListGroup>
-            <Row title="Completed assignments" detail={String(Object.keys(done).length)} />
-            <Row title="Quick-added events" detail={String(quickEvents.length)} />
-            <Row title="Storage used" detail={`${kb} KB`} last />
+            <Row
+              title="Local Data"
+              subtitle={`${Object.keys(done).length} completed · ${quickEvents.length} quick-added · ${kb} KB`}
+              onClick={() => setPage('local-data')}
+              last
+            />
           </ListGroup>
-
-          <div className="px-4 pt-4">
-            {confirmClear ? (
-              <div className="rounded-[16px] bg-card p-4">
-                <p className="text-[15px] leading-[20px] text-label">
-                  Clear all check-marks and quick-added events? Your calendars, theme and preferences
-                  stay.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <Button variant="gray" className="flex-1" onClick={() => setConfirmClear(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => {
-                      clearAll({ keepAuth: true });
-                      setDone({});
-                      setQuickEvents([]);
-                      setConfirmClear(false);
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button variant="destructive" className="w-full" onClick={() => setConfirmClear(true)}>
-                Clear local data
-              </Button>
-            )}
-          </div>
 
           <p className="px-5 pt-6 text-center text-[12px] leading-[16px] text-label-3">
             Personal build · live from umassdining.com, umass.edu/recwell, events.umass.edu and
@@ -129,7 +115,61 @@ export function SettingsScreen({ open, onClose }) {
           />
         </div>
       </Sheet>
+
+      <Sheet open={page === 'local-data'} onClose={() => setPage(null)} title="Local Data">
+        <LocalDataPage
+          done={done}
+          quickEvents={quickEvents}
+          kb={kb}
+          confirmClear={confirmClear}
+          setConfirmClear={setConfirmClear}
+          onClear={() => {
+            clearAll({ keepAuth: true });
+            setDone({});
+            setQuickEvents([]);
+            setConfirmClear(false);
+          }}
+        />
+      </Sheet>
     </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+function LocalDataPage({ done, quickEvents, kb, confirmClear, setConfirmClear, onClear }) {
+  return (
+    <div className="pb-10">
+      <SectionHeader>What's stored</SectionHeader>
+      <ListGroup>
+        <Row title="Completed assignments" detail={String(Object.keys(done).length)} />
+        <Row title="Quick-added events" detail={String(quickEvents.length)} />
+        <Row title="Storage used" detail={`${kb} KB`} last />
+      </ListGroup>
+
+      <div className="px-4 pt-6">
+        {confirmClear ? (
+          <div className="rounded-[16px] bg-card p-4">
+            <p className="text-[15px] leading-[20px] text-label">
+              Clear all check-marks and quick-added events? Your calendars, theme and preferences
+              stay.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <Button variant="gray" className="flex-1" onClick={() => setConfirmClear(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" className="flex-1" onClick={onClear}>
+                Clear
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="destructive" className="w-full" onClick={() => setConfirmClear(true)}>
+            Clear local data
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

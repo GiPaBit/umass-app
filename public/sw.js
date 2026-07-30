@@ -9,8 +9,15 @@
  * API responses are never cached here; freshness is handled in src/lib/api.js,
  * which keeps a per-endpoint snapshot and marks it stale when it falls back.
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const SHELL = `umass-shell-${VERSION}`;
+
+// Served from "/" self-hosted and from "/umass-app/" on GitHub Pages. Everything cached
+// here is relative to wherever the worker was registered, so derive that from the
+// worker's own URL rather than templating this file at build time — it is copied out of
+// public/ verbatim and never sees Vite's `base`.
+const BASE = new URL('./', self.location).pathname;
+const SHELL_URL = `${BASE}index.html`;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -18,12 +25,15 @@ self.addEventListener('install', (event) => {
       const cache = await caches.open(SHELL);
       // Pull the built asset URLs out of index.html rather than hard-coding
       // hashed filenames that change every build.
-      const res = await fetch('/index.html', { cache: 'reload' });
+      const res = await fetch(SHELL_URL, { cache: 'reload' });
       const html = await res.text();
+      // Vite rewrites these with its `base`, so they stay root-absolute at any base.
       const assets = [...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css))"/g)].map((m) => m[1]);
 
-      await cache.put('/index.html', new Response(html, { headers: res.headers }));
-      await cache.addAll([...new Set([...assets, '/manifest.webmanifest', '/icons/icon-192.png'])]);
+      await cache.put(SHELL_URL, new Response(html, { headers: res.headers }));
+      await cache.addAll([
+        ...new Set([...assets, `${BASE}manifest.webmanifest`, `${BASE}icons/icon-192.png`]),
+      ]);
       await self.skipWaiting();
     })(),
   );
@@ -53,10 +63,10 @@ self.addEventListener('fetch', (event) => {
       fetch(request)
         .then((res) => {
           const copy = res.clone();
-          caches.open(SHELL).then((c) => c.put('/index.html', copy));
+          caches.open(SHELL).then((c) => c.put(SHELL_URL, copy));
           return res;
         })
-        .catch(async () => (await caches.match('/index.html')) || Response.error()),
+        .catch(async () => (await caches.match(SHELL_URL)) || Response.error()),
     );
     return;
   }

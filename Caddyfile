@@ -1,0 +1,10 @@
+# Caddy reads DOMAIN from its own environment; docker-compose.yml passes it through.
+# Certificates are issued and renewed automatically, which is the whole reason this
+# service exists: GitHub Pages is HTTPS-only and a page there cannot call an http:// API.
+{$DOMAIN} {
+	# Neither Caddy's reverse_proxy nor the Node server compresses anything on its own,
+	# and the bundle is ~330 kB raw against ~108 kB gzipped.
+	encode zstd gzip
+
+	reverse_proxy app:8080
+}

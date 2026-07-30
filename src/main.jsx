@@ -19,7 +19,11 @@ createRoot(document.getElementById('root')).render(
 // Register the offline shell once the page has settled.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    const base = import.meta.env.BASE_URL; // "/" self-hosted, "/umass-app/" on GitHub Pages
+    // updateViaCache:'none' because Pages serves everything with a ten-minute max-age and
+    // gives no way to override it — without this the browser can keep handing back a stale
+    // worker script for that long, pinning an old build.
+    navigator.serviceWorker.register(`${base}sw.js`, { scope: base, updateViaCache: 'none' }).catch(() => {
       // A failed registration only costs offline support; the app still works.
     });
   });

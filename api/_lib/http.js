@@ -1,7 +1,7 @@
 // Shared fetch + response helpers for every API route.
 // Files prefixed with `_` are ignored by Vercel's route scanner, so this stays a library.
 
-const UA =
+export const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
 /** Fetch a URL as text with a browser UA and a hard timeout. */

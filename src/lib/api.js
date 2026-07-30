@@ -12,6 +12,13 @@
  */
 const inFlight = new Map();
 
+/**
+ * Where /api lives. Empty — the default, and what the Docker image is built with —
+ * means same origin. The GitHub Pages build points this at the self-hosted container,
+ * because Pages is static and cannot run api/*.js.
+ */
+const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
+
 function get(path) {
   const existing = inFlight.get(path);
   if (existing) return existing;
@@ -27,6 +34,9 @@ const SNAPSHOT_PREFIX = 'umass:snapshot:';
  * Remember the last good response per endpoint, so opening with no signal shows
  * what the app last knew — stamped with when — instead of four empty cards.
  * Snapshots are only ever read when the network attempt fails.
+ *
+ * Keyed on the bare path, never on API_BASE + path: pointing the app at a different
+ * backend would otherwise orphan every snapshot already on the device.
  */
 function saveSnapshot(path, body) {
   try {
@@ -61,7 +71,7 @@ export function snapshotBytes() {
 
 async function fetchJson(path) {
   try {
-    const res = await fetch(path, { headers: { accept: 'application/json' } });
+    const res = await fetch(API_BASE + path, { headers: { accept: 'application/json' } });
     let body;
     try {
       body = await res.json();
@@ -106,7 +116,8 @@ export const getRec = () => get('/api/rec');
 export async function getCanvasAssignments(feeds) {
   const payload = typeof feeds === 'string' ? { feed: feeds } : { feeds };
 
-  const res = await fetch('/api/canvas', {
+  // Prefixed separately because this one does not go through fetchJson.
+  const res = await fetch(`${API_BASE}/api/canvas`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify(payload),

@@ -1,0 +1,75 @@
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never cancel a deploy mid-upload; Pages would be left half-updated.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - id: pages
+        uses: actions/configure-pages@v6
+
+      # Pages is static: it cannot run api/*.js. Without an API base the bundle would
+      # fetch gipabit.github.io/api/*, get GitHub's 404 HTML page, fail to parse it as
+      # JSON, and fall back to an offline snapshot that does not exist on a fresh
+      # device — empty screens with no error shown anywhere. Fail loudly instead.
+      - name: Require an API base
+        env:
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+        run: |
+          if [ -z "$VITE_API_BASE" ]; then
+            echo "::error::Set the repository variable VITE_API_BASE to the https:// origin of the Docker deployment (Settings -> Secrets and variables -> Actions -> Variables)."
+            exit 1
+          fi
+          case "$VITE_API_BASE" in
+            https://*) ;;
+            # Pages is HTTPS-only, so the browser blocks an http:// API as mixed content.
+            *) echo "::error::VITE_API_BASE must start with https:// — Pages is HTTPS-only and would block it as mixed content."; exit 1 ;;
+          esac
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          # Pages serves this repo from a subpath (gipabit.github.io/umass-app/). Taken
+          # from configure-pages rather than hardcoded so it becomes "/" by itself if a
+          # custom domain is ever added. Vite rewrites index.html's script, manifest
+          # and icon URLs to match.
+          APP_BASE: ${{ steps.pages.outputs.base_path }}
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # Required by actions/deploy-pages — the job errors out without this block.
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5

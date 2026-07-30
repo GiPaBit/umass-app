@@ -1,0 +1,58 @@
+services:
+  app:
+    # Lowercase on purpose — GHCR rejects the capitals in the "GiPaBit" owner name.
+    # Build locally instead with: docker compose build
+    image: ghcr.io/gipabit/umass-app:latest
+    build:
+      context: .
+      args:
+        APP_BASE: /
+        VITE_API_BASE: ''
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    # Not published to the host: Caddy is the only way in, so TLS is not optional.
+    expose:
+      - '8080'
+    environment:
+      # Origins allowed to read the API from a browser. Leave empty for a plain
+      # self-hosted install — the frontend this container serves is same-origin and
+      # needs no CORS at all. Set it to https://gipabit.github.io to also serve the
+      # GitHub Pages copy of the frontend from here.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    # Reaps the zombie processes a PID-1 Node would otherwise leave behind.
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80' # required for the Let's Encrypt HTTP-01 challenge, not just redirects
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      # The Caddyfile reads {$DOMAIN} from Caddy's own process environment. Compose
+      # only interpolates inside this file, never inside a mounted config — without
+      # this line Caddy sees an empty site address, serves plain HTTP on :80, and
+      # looks like it worked.
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # issued certificates — losing this re-issues and burns the LE rate limit
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+  caddy_config:

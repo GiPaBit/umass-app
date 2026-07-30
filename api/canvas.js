@@ -1,5 +1,10 @@
-import { fetchText, handleErrors, sendJson } from './_lib/http.js';
+import { handleErrors, sendJson } from './_lib/http.js';
+import { fetchPublicText } from './_lib/safeFetch.js';
 import { parseIcs, toAssignments } from './_lib/ics.js';
+
+// Each feed is one outbound request, so an uncapped list turns this route into a
+// request amplifier. Nobody subscribes to more calendars than this.
+const MAX_FEEDS = 10;
 
 /**
  * POST /api/canvas
@@ -26,6 +31,7 @@ export default handleErrors(async (req, res) => {
       : [];
 
   if (!feeds.length) throw new Error('No calendar feed URL supplied.');
+  if (feeds.length > MAX_FEEDS) throw new Error(`Too many feeds at once (limit ${MAX_FEEDS}).`);
 
   const results = await Promise.allSettled(feeds.map((feed) => loadFeed(feed)));
 
@@ -53,7 +59,8 @@ export default handleErrors(async (req, res) => {
 
 async function loadFeed(feed) {
   const url = normaliseFeedUrl(feed.url || '');
-  const text = await fetchText(url, { timeout: 15000 });
+  // fetchPublicText rather than fetchText: this URL came from a user, not from us.
+  const text = await fetchPublicText(url, { timeout: 15000 });
 
   if (!/BEGIN:VCALENDAR/i.test(text)) {
     throw new Error('That URL did not return a calendar file. Check you copied the whole link.');
@@ -86,17 +93,39 @@ function normaliseFeedUrl(feed) {
   return parsed.toString();
 }
 
+const MAX_BODY = 1e6;
+
 function readJsonBody(req) {
-  // Vercel parses JSON bodies for us; the dev middleware hands over a raw stream.
+  // Vercel parses JSON bodies for us; server/api-router.js — used by both `vite dev`
+  // and the self-hosted server — deliberately leaves the raw stream alone.
   if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
+
+  // A declared length is refused before a byte is read, so an honest client gets the
+  // error rather than the dropped socket the streaming guard below has to resort to.
+  // A real payload is a few feed URLs — under a kilobyte.
+  if (Number(req.headers['content-length']) > MAX_BODY) {
+    return Promise.reject(new Error('Request body too large.'));
+  }
 
   return new Promise((resolve, reject) => {
     let raw = '';
+    // On Vercel req.body was pre-parsed and this branch never ran, so the cap below was
+    // never exercised: rejecting alone leaves the listener attached and `raw` still
+    // growing. Self-hosted that is an unbounded allocation from one request, so destroy
+    // the socket and latch, rather than just settling the promise.
+    let settled = false;
     req.on('data', (chunk) => {
+      if (settled) return;
       raw += chunk;
-      if (raw.length > 1e6) reject(new Error('Request body too large.'));
+      if (raw.length > MAX_BODY) {
+        settled = true;
+        req.destroy();
+        reject(new Error('Request body too large.'));
+      }
     });
     req.on('end', () => {
+      if (settled) return;
+      settled = true;
       if (!raw) return resolve({});
       try {
         resolve(JSON.parse(raw));

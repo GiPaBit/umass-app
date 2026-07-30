@@ -1,0 +1,20 @@
+# The build stage copies what it needs by name, so this is belt-and-braces — but it
+# keeps the build context small and stops a stray .env from ever reaching an image.
+node_modules
+dist
+.git
+.github
+.env
+.env.*
+!.env.example
+.vercel
+.DS_Store
+.claude
+.agents
+agent
+skills-lock.json
+*.md
+Dockerfile
+.dockerignore
+docker-compose.yml
+Caddyfile

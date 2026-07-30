@@ -108,7 +108,8 @@ use the ICS path above; it does the same job.
    **APIs & Services → Library** → enable *Google Calendar API*.
 3. **OAuth consent screen** → External → add your own email as a **Test user**.
 4. **Credentials → Create credentials → OAuth client ID → Web application**.
-   Authorised JavaScript origins: `http://localhost:5173` and your Vercel URL.
+   Authorised JavaScript origins: `http://localhost:5173` plus every deployed
+   origin you use (see *Deploying* below).
 5. ```bash
    cp .env.example .env.local
    # set VITE_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
@@ -121,40 +122,136 @@ Scope is `calendar.readonly`; the token lives in localStorage.
 
 ---
 
-## Deploying to Vercel
+## Deploying
+
+Three targets, all from the same source. **The app is not static** — the four tabs
+get their data from `/api/*`, which exists because none of the upstream sites send
+CORS headers. Any deployment has to run those routes somewhere.
+
+On your iPhone, whichever you pick: open the URL in Safari → Share → **Add to Home
+Screen**. It launches full-screen with no browser chrome.
+
+### Self-hosted with Docker (recommended)
+
+One container serves the built frontend *and* `/api/*` on the same origin, so there
+is nothing to configure for CORS. Caddy sits in front and gets a Let's Encrypt
+certificate automatically.
+
+```bash
+cp .env.example .env      # set DOMAIN
+docker compose up -d
+```
+
+Requirements: `DOMAIN` already resolves to the host, and ports 80 and 443 are
+reachable from the internet — Let's Encrypt's HTTP-01 challenge needs port 80.
+
+The image is published to GHCR for `linux/amd64` and `linux/arm64` on every push to
+`main`, so a server only ever needs:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+To build locally instead: `docker compose build`. To run the production server
+without Docker: `npm run build && npm start` (port 8080, override with `PORT`).
+
+> `npm run preview` builds and then runs that same server. Plain `vite preview`
+> is not used here because it serves `dist/` without `api/*`, which makes every
+> tab look broken.
+
+### GitHub Pages
+
+Pages hosts the frontend only; it cannot run `api/*.js`. The Pages build therefore
+points at a Docker deployment's API over HTTPS.
+
+1. **Settings → Pages → Source: GitHub Actions.**
+2. **Settings → Secrets and variables → Actions → Variables** → add
+   `VITE_API_BASE` = `https://your-domain` (the Docker deployment). It must be
+   `https://` — Pages is HTTPS-only and a browser blocks an `http://` API as mixed
+   content. The workflow fails loudly if this is unset.
+3. On the server, allow the Pages origin to read the API:
+   ```bash
+   # in .env
+   ALLOWED_ORIGINS=https://<you>.github.io
+   ```
+   then `docker compose up -d`.
+
+The base path comes from `actions/configure-pages`, so it adapts by itself if a
+custom domain is added later.
+
+> The Pages copy and a self-hosted copy are **two independent installs**.
+> localStorage is per-origin, so feed URLs, themes and completed assignments do not
+> carry across — and neither does anything from an older Vercel origin.
+
+### Vercel
+
+Still supported and unchanged; `vercel.json` runs `api/*` as serverless functions.
 
 ```bash
 npx vercel
 ```
 
 Nothing to configure — the Canvas feed link is entered in the app itself, not at
-build time. (Only if you chose the optional Google path: add
-`VITE_GOOGLE_CLIENT_ID` under **Project → Settings → Environment Variables**, add
-the deployed origin to the OAuth client's authorised origins, then redeploy.)
+build time.
 
-On your iPhone: open the URL in Safari → Share → **Add to Home Screen**. It
-launches full-screen with no browser chrome.
+### Optional: Google Calendar on a new origin
+
+If you use the Google path, add each deployed origin to the OAuth client's
+**Authorised JavaScript origins** (`https://<you>.github.io`, `https://your-domain`)
+or sign-in fails with an opaque error. Pass the client ID to CI as the repository
+variable `VITE_GOOGLE_CLIENT_ID` — it is inlined at build time, so it cannot be set
+by an environment variable at run time.
+
+### Environment variables
+
+| Variable | When | Purpose |
+| --- | --- | --- |
+| `VITE_API_BASE` | build | Where `/api` lives. Empty = same origin (dev, Docker). Only Pages sets it. |
+| `VITE_GOOGLE_CLIENT_ID` | build | Optional Google OAuth client ID. |
+| `APP_BASE` | build | Vite base path. `/` by default; Pages uses `/<repo>/`. Must be absolute. |
+| `ALLOWED_ORIGINS` | run | Comma-separated origins allowed to read the API cross-origin. |
+| `DOMAIN` | run | Domain Caddy issues a certificate for. |
+| `PORT`, `HOST` | run | Server bind address. Defaults `8080` / `0.0.0.0`. |
+| `ALLOW_PRIVATE_FEEDS` | run | Set to `1` only to allow calendar feeds on private IPs (see below). |
+
+> **The API is a fetch proxy, and CORS does not gate `curl`.** Once it is public,
+> anyone can ask your server to fetch a calendar URL. `api/_lib/safeFetch.js`
+> therefore resolves user-supplied feed hosts and refuses anything that is not
+> publicly routable — loopback, RFC1918, link-local (including cloud metadata at
+> `169.254.169.254`), and the IPv6 forms that wrap those — re-checking on every
+> redirect. `ALLOW_PRIVATE_FEEDS=1` disables that, which you want only for a
+> calendar hosted on your own LAN.
 
 ---
 
 ## Project layout
 
 ```
-api/                      Vercel serverless routes (on-demand fetch + parse)
+api/                      HTTP routes (on-demand fetch + parse), Node built-ins only
   canvas.js               POST { feed } -> assignments from the Canvas ICS feed
   dining.js               ?hall=<slug> for a menu, no params for the overview
   events.js               merges every registered event source
   rec.js                  facility hours + intramural/club/fitness info
   _lib/                   parsers and shared fetch helpers (not routed)
     ics.js                RFC 5545 parser (folding, escapes, TZID, all-day)
+    safeFetch.js          SSRF-guarded fetch for user-supplied feed URLs
     events/               one module per event source  <- extension point
+server/
+  index.js                production server: serves dist/ + mounts api/*  (npm start)
+  api-router.js           the one "/api/<name> -> api/<name>.js" implementation
 src/
   lib/                    data + business logic, no React
   hooks/                  useAsync, useLocalState
   components/             Screen (large title + pull-to-refresh), TabBar, ui
   screens/                one file per tab
-dev-api-plugin.js         runs api/*.js as middleware under `vite dev`
+dev-api-plugin.js         mounts server/api-router.js into `vite dev`
+Dockerfile                multi-stage; runtime stage has no node_modules
+docker-compose.yml        app + Caddy (automatic TLS)
 ```
+
+The same `api/*.js` handlers run in all three deployments. `vite dev` and the
+production server both route through `server/api-router.js` — one implementation, so a
+route cannot behave differently in dev, Docker and Vercel.
 
 `src/lib` holds no React, and every screen gets its data through `src/lib/api.js`
 or `src/lib/google.js`. Porting to Expo would mean replacing `components/` and

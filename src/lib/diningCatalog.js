@@ -112,6 +112,30 @@ export function findVenue(name) {
   );
 }
 
+/**
+ * Deep links to open a venue's location in Apple Maps / Google Maps. Falls back
+ * to a name + "UMass Amherst" text search for the couple of venues with no known
+ * coordinate (The Hub, Carney Café), so every place gets a working link.
+ */
+export function mapLinks(venue) {
+  const catalogVenue = venue?.lat != null ? venue : findVenue(venue?.name);
+  const name = venue?.name || catalogVenue?.name || '';
+
+  if (catalogVenue?.lat != null && catalogVenue?.lon != null) {
+    const { lat, lon } = catalogVenue;
+    return {
+      apple: `https://maps.apple.com/?ll=${lat},${lon}&q=${encodeURIComponent(name)}`,
+      google: `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`,
+    };
+  }
+
+  const query = encodeURIComponent(`${name} UMass Amherst`);
+  return {
+    apple: `https://maps.apple.com/?q=${query}`,
+    google: `https://www.google.com/maps/search/?api=1&query=${query}`,
+  };
+}
+
 /** Accents, punctuation and "the" all vary between the site and this list. */
 export function normalise(name = '') {
   return name

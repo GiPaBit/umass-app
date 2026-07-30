@@ -9,9 +9,15 @@ export const TABS = [
 ];
 
 /** Frosted bottom tab bar sitting above the home indicator. */
-export function TabBar({ active, onChange, badges = {} }) {
+export function TabBar({ active, onChange, badges = {}, floating = false }) {
   return (
-    <nav className="ios-blur pb-safe absolute inset-x-0 bottom-0 z-30 border-t border-separator/70">
+    <nav
+      className={
+        floating
+          ? 'ios-blur absolute inset-x-6 bottom-[max(env(safe-area-inset-bottom),12px)] z-30 rounded-full shadow-lg'
+          : 'ios-blur pb-safe absolute inset-x-0 bottom-0 z-30 border-t border-separator/70'
+      }
+    >
       <div className="flex">
         {TABS.map(({ id, label, Icon }) => {
           const selected = active === id;

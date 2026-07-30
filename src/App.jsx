@@ -17,6 +17,10 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickEvents] = useLocalState(KEYS.quickEvents, []);
   const [needsOnboarding, setNeedsOnboarding] = useState(() => !isOnboarded());
+  // The dining map takes over the whole screen and turns the tab bar into a
+  // floating island — only while that tab is both active and on its map view.
+  const [diningMapActive, setDiningMapActive] = useState(false);
+  const tabBarFloating = tab === 'dining' && diningMapActive;
 
   // Badge the Events tab with anything the user pinned for today.
   const badges = useMemo(
@@ -59,7 +63,7 @@ export default function App() {
         <AssignmentsScreen onOpenSettings={openSettings} />
       </TabPane>
       <TabPane active={tab === 'dining'}>
-        <DiningScreen />
+        <DiningScreen active={tab === 'dining'} onMapModeChange={setDiningMapActive} />
       </TabPane>
       <TabPane active={tab === 'rec'}>
         <RecScreen />
@@ -68,7 +72,7 @@ export default function App() {
         <EventsScreen />
       </TabPane>
 
-      <TabBar active={tab} onChange={setTab} badges={badges} />
+      <TabBar active={tab} onChange={setTab} badges={badges} floating={tabBarFloating} />
 
       <SettingsScreen open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

@@ -76,6 +76,13 @@ export function AssignmentsScreen({ onOpenSettings }) {
 
   const days = useMemo(() => groupByDay(visible, (a) => a.due), [visible]);
 
+  // Unchecking the last completed item while viewing "completed" would otherwise
+  // strand the view empty with no way back — the toggle button below only shows
+  // when there's something completed to show it for.
+  useEffect(() => {
+    if (showDone && completed.length === 0) setShowDone(false);
+  }, [showDone, completed.length]);
+
   const toggle = (id) => {
     const markingDone = !done[id];
 
@@ -173,7 +180,7 @@ export function AssignmentsScreen({ onOpenSettings }) {
             </div>
           ))}
 
-          {completed.length > 0 && (
+          {(completed.length > 0 || showDone) && (
             <div className="px-4 pt-6">
               <Button variant="gray" className="w-full" onClick={() => setShowDone((v) => !v)}>
                 {showDone ? `Show open (${pending.length})` : `Show completed (${completed.length})`}

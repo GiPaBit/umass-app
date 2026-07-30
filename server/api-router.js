@@ -1,14 +1,5 @@
 import { readdirSync } from 'node:fs';
-
-/**
- * Browsers on these origins may read the API. Empty — what the Docker image ships
- * with — means same-origin only. The GitHub Pages frontend is a different origin, so
- * its URL has to be listed here or every request it makes fails CORS.
- */
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map((s) => s.trim().replace(/\/$/, ''))
-  .filter(Boolean);
+import { applyCors } from '../api/_lib/http.js';
 
 /**
  * The one implementation of "/api/<name> -> api/<name>.js". `vite dev` and the
@@ -74,24 +65,6 @@ export function createApiRouter({ apiDir, loadModule, onError }) {
     }
     return true;
   };
-}
-
-function applyCors(req, res) {
-  // Vary even when refusing: sendJson marks responses `public, s-maxage=60`, and a
-  // shared cache must never hand one origin another origin's allow-origin header.
-  res.setHeader('vary', 'Origin');
-
-  const origin = req.headers.origin;
-  if (!origin || !ALLOWED_ORIGINS.includes(origin)) return;
-
-  res.setHeader('access-control-allow-origin', origin);
-  res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
-  // POST /api/canvas sends content-type: application/json, which is not a safelisted
-  // value, so that request is always preflighted.
-  res.setHeader('access-control-allow-headers', 'content-type, accept');
-  res.setHeader('access-control-max-age', '86400');
-  // No allow-credentials: the feed URL in the body is the only credential in play and
-  // it is sent explicitly, never as a cookie.
 }
 
 /** The small sugar Vercel adds to `res`. Unused today — every route goes through sendJson — but kept for parity. */

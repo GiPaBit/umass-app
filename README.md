@@ -138,9 +138,12 @@ is nothing to configure for CORS. Caddy sits in front and gets a Let's Encrypt
 certificate automatically.
 
 ```bash
-cp .env.example .env      # set DOMAIN
+cp .env.example .env      # set DOMAIN, uncomment COMPOSE_PROFILES=prod
 docker compose up -d
 ```
+
+`COMPOSE_PROFILES=prod` is what turns Caddy on. Without it, `docker compose up`
+starts only `app` — see *Local dev with Docker* below.
 
 Requirements: `DOMAIN` already resolves to the host, and ports 80 and 443 are
 reachable from the internet — Let's Encrypt's HTTP-01 challenge needs port 80.
@@ -154,6 +157,24 @@ docker compose pull && docker compose up -d
 
 To build locally instead: `docker compose build`. To run the production server
 without Docker: `npm run build && npm start` (port 8080, override with `PORT`).
+
+### Local dev with Docker
+
+`npm run dev` on the host is the fastest loop and needs nothing below. If you'd
+rather keep everything containerized, `docker-compose.override.yml` is picked up
+automatically by a plain `docker compose up` (no `-f` flag needed) and points `app`
+at a `dev` build stage instead: devDependencies kept, source bind-mounted in, Vite's
+dev server on `:5173` with hot reload.
+
+```bash
+echo "DOMAIN=localhost" > .env   # placeholder only — Compose requires the variable
+                                  # to exist even though caddy never starts in dev
+docker compose up
+```
+
+Caddy is gated behind the `prod` profile (see above), so this starts only `app`. It
+has nothing to do in dev anyway — it exists to get a Let's Encrypt cert for a real
+domain, and Vite already binds `0.0.0.0:5173` directly with no TLS involved.
 
 > `npm run preview` builds and then runs that same server. Plain `vite preview`
 > is not used here because it serves `dist/` without `api/*`, which makes every

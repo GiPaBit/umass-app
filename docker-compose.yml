@@ -34,6 +34,12 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    # Opt-in: a real deployment needs COMPOSE_PROFILES=prod in .env (see .env.example)
+    # or `docker compose --profile prod up -d`. Without it, `docker compose up` — what
+    # docker-compose.override.yml is for — starts only `app`. Caddy has nothing to do in
+    # dev anyway: it exists to get a Let's Encrypt cert for a real domain and proxy that
+    # to :8080, and the dev override runs Vite on :5173 with no TLS involved.
+    profiles: ['prod']
     restart: unless-stopped
     ports:
       - '80:80' # required for the Let's Encrypt HTTP-01 challenge, not just redirects

@@ -1,0 +1,28 @@
+# Auto-loaded by `docker compose up` alongside docker-compose.yml — no -f flag needed,
+# and nothing to opt into. Only affects local runs from a checkout; a real Docker
+# context (`docker compose -f docker-compose.yml ...`, the GHCR publish workflow, a
+# deployed server's `docker compose pull && docker compose up -d`) never sees this file.
+#
+# Turns `app` into Vite's dev server with the repo bind-mounted in, instead of the
+# production build baked into the image. Run `docker compose up app` — deliberately
+# leaving out `caddy`, which this file does not touch: Vite already binds 0.0.0.0:5173,
+# and Caddy's automatic TLS has nothing to do on localhost.
+services:
+  app:
+    # Distinct from the `ghcr.io/gipabit/umass-app:latest` the base file names, so a
+    # dev build here can never be mistaken for (or overwrite the tag of) a pulled image.
+    image: umass-app:dev
+    build:
+      target: dev
+    ports:
+      - '5173:5173'
+    volumes:
+      - .:/app
+      # Shadows the bind mount above for this one path, so the image's own Linux
+      # node_modules (installed in the `dev` stage) wins over whatever — if anything —
+      # is sitting in the host's, which would be macOS binaries for native deps.
+      - /app/node_modules
+    # The base file's healthcheck polls :8080, the production server's port. The dev
+    # server never opens it, so the check would just fail forever.
+    healthcheck:
+      disable: true

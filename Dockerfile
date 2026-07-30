@@ -35,6 +35,22 @@ COPY api ./api
 COPY server ./server
 RUN npm run build
 
+# ---------------------------------------------------------------------------
+# Dev stage: only reached via docker-compose.override.yml (`docker compose up app`),
+# which sets `target: dev`. Never built by CI or a plain `docker build .`, since
+# `runtime` below stays the last stage in the file and so is still the default target.
+#
+# Keeps devDependencies and runs Vite's dev server instead of building. Nothing beyond
+# the lockfile is copied — the override bind-mounts the whole repo over /app at
+# runtime, and its anonymous volume on /app/node_modules keeps this layer's Linux
+# node_modules from being shadowed by the host's (if any — likely macOS binaries).
+FROM node:22-alpine AS dev
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+EXPOSE 5173
+CMD ["npm", "run", "dev"]
+
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \

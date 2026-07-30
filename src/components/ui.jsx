@@ -316,6 +316,39 @@ export function ErrorState({ error, onRetry, what = 'this' }) {
   );
 }
 
+/** Shown when data came from the offline snapshot instead of the network. */
+export function StaleNotice({ data }) {
+  if (!data?.stale) return null;
+  const when = data.cachedAt
+    ? new Date(data.cachedAt).toLocaleString('en-US', {
+        weekday: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : 'earlier';
+  return (
+    <div className="mx-4 mt-3 rounded-[12px] bg-fill px-4 py-2.5">
+      <p className="text-[13px] leading-[18px] text-label-2">
+        You’re offline — showing what was last loaded {when}.
+      </p>
+    </div>
+  );
+}
+
+/** A circular floating action, used where there is no nav bar to sit in. */
+export function RoundButton({ children, onClick, label }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="ios-press-scale ios-blur flex h-9 w-9 items-center justify-center rounded-full text-ios-blue shadow-sm"
+    >
+      {children}
+    </button>
+  );
+}
+
 /** Non-fatal per-source warnings ("Athletics didn't load, everything else did"). */
 export function FailureNotice({ failures }) {
   if (!failures?.length) return null;

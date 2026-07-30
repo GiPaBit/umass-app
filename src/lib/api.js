@@ -21,21 +21,67 @@ function get(path) {
   return request;
 }
 
-async function fetchJson(path) {
-  const res = await fetch(path, { headers: { accept: 'application/json' } });
-  let body;
+const SNAPSHOT_PREFIX = 'umass:snapshot:';
+
+/**
+ * Remember the last good response per endpoint, so opening with no signal shows
+ * what the app last knew — stamped with when — instead of four empty cards.
+ * Snapshots are only ever read when the network attempt fails.
+ */
+function saveSnapshot(path, body) {
   try {
-    body = await res.json();
+    localStorage.setItem(SNAPSHOT_PREFIX + path, JSON.stringify({ at: Date.now(), body }));
   } catch {
-    throw new Error(`${path} returned a non-JSON response (${res.status})`);
+    // Storage full or unavailable — the app just becomes online-only.
   }
-  if (!res.ok || body?.ok === false) {
-    const err = new Error(body?.hint || body?.error || `Request failed (${res.status})`);
-    err.detail = body?.error;
-    err.source = body?.source;
-    throw err;
+}
+
+function readSnapshot(path) {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_PREFIX + path);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
-  return body;
+}
+
+export function clearSnapshots() {
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith(SNAPSHOT_PREFIX)) localStorage.removeItem(key);
+  }
+}
+
+export function snapshotBytes() {
+  let total = 0;
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith(SNAPSHOT_PREFIX)) total += localStorage.getItem(key).length;
+  }
+  return total;
+}
+
+async function fetchJson(path) {
+  try {
+    const res = await fetch(path, { headers: { accept: 'application/json' } });
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      throw new Error(`${path} returned a non-JSON response (${res.status})`);
+    }
+    if (!res.ok || body?.ok === false) {
+      const err = new Error(body?.hint || body?.error || `Request failed (${res.status})`);
+      err.detail = body?.error;
+      err.source = body?.source;
+      throw err;
+    }
+    saveSnapshot(path, body);
+    return body;
+  } catch (err) {
+    const cached = readSnapshot(path);
+    if (!cached) throw err;
+    // Flagged stale so the UI can say how old this is.
+    return { ...cached.body, stale: true, cachedAt: cached.at };
+  }
 }
 
 /** All dining halls (hours) plus every cafe/Blue Wall venue with today's hours. */

@@ -11,14 +11,53 @@ import {
   SectionHeader,
   SegmentedControl,
   Sheet,
+  StaleNotice,
   StatusPill,
 } from '../components/ui.jsx';
 import { getDiningOverview, getHallMenu } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
+import { CampusMap } from '../components/CampusMap.jsx';
+import { ALL_VENUES, normalise } from '../lib/diningCatalog.js';
 
 export function DiningScreen() {
   const { data, error, loading, refresh } = useAsync(getDiningOverview);
   const [openHall, setOpenHall] = useState(null);
+  const [view, setView] = useState('list');
+  const [selectedPin, setSelectedPin] = useState(null);
+
+  /** Every live place, flattened, so the map can match them by name. */
+  const livePlaces = useMemo(() => {
+    if (!data) return [];
+    return [
+      ...data.halls.map((h) => ({ name: h.name, status: h.status, hoursText: h.status?.hoursText, hall: h })),
+      ...data.categories.flatMap((c) =>
+        c.venues.map((v) => ({ name: v.name, status: v.status, hoursText: v.hoursText })),
+      ),
+    ];
+  }, [data]);
+
+  /** Live open/closed for a catalogue venue, matched loosely by name. */
+  const statusOf = useMemo(() => {
+    const index = new Map(livePlaces.map((p) => [normalise(p.name), p]));
+    return (name) => {
+      const key = normalise(name);
+      const hit =
+        index.get(key) ||
+        [...index.entries()].find(([k]) => k.includes(key) || key.includes(k))?.[1];
+      return hit?.status?.state || 'unknown';
+    };
+  }, [livePlaces]);
+
+  const hoursOf = useMemo(() => {
+    const index = new Map(livePlaces.map((p) => [normalise(p.name), p]));
+    return (name) => {
+      const key = normalise(name);
+      const hit =
+        index.get(key) ||
+        [...index.entries()].find(([k]) => k.includes(key) || key.includes(k))?.[1];
+      return hit?.hoursText || hit?.status?.hoursText || null;
+    };
+  }, [livePlaces]);
 
   const openCount = useMemo(() => {
     if (!data) return 0;
@@ -33,11 +72,61 @@ export function DiningScreen() {
       subtitle={data ? `${openCount} open right now` : undefined}
       onRefresh={refresh}
     >
+      <div className="px-4 pt-1 pb-1">
+        <SegmentedControl
+          options={[
+            { value: 'list', label: 'List' },
+            { value: 'map', label: 'Map' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </div>
+
       {loading && !data && <LoadingState label="Checking menus…" />}
       {error && !data && <ErrorState error={error} what="dining" onRetry={refresh} />}
 
-      {data && (
+      {data && view === 'map' && (
         <>
+          <div className="pt-2">
+            <CampusMap
+              venues={ALL_VENUES}
+              statusOf={statusOf}
+              selectedPinId={selectedPin?.id}
+              onSelectPin={setSelectedPin}
+            />
+          </div>
+
+          {selectedPin ? (
+            <>
+              <SectionHeader>{selectedPin.label}</SectionHeader>
+              <ListGroup>
+                {selectedPin.venues.map((venue, i) => (
+                  <Row
+                    key={venue.name}
+                    last={i === selectedPin.venues.length - 1}
+                    trailing={<StatusPill state={statusOf(venue.name)} />}
+                  >
+                    <div className="text-[17px] leading-[22px] text-label">{venue.name}</div>
+                    <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
+                      {hoursOf(venue.name) || venue.groupName}
+                    </div>
+                  </Row>
+                ))}
+              </ListGroup>
+            </>
+          ) : (
+            <p className="px-5 pt-4 text-center text-[14px] leading-[19px] text-label-2">
+              Tap a pin to see what’s there. Green means something is open now; a number means several
+              places share that spot.
+            </p>
+          )}
+        </>
+      )}
+
+      {data && view === 'list' && (
+        <>
+          <StaleNotice data={data} />
           <FailureNotice failures={data.failures} />
 
           <SectionHeader>Dining Commons</SectionHeader>

@@ -8,9 +8,11 @@ import {
   FailureNotice,
   ListGroup,
   LoadingState,
+  RoundButton,
   SectionHeader,
   SegmentedControl,
   Sheet,
+  StaleNotice,
 } from '../components/ui.jsx';
 import { PlusIcon } from '../components/Icons.jsx';
 import { getEvents } from '../lib/api.js';
@@ -57,14 +59,9 @@ export function EventsScreen() {
       subtitle={data || quickEvents.length ? `${filtered.length} upcoming` : undefined}
       onRefresh={refresh}
       trailing={
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          aria-label="Quick add an event"
-          className="ios-press-scale -m-1 p-1 text-ios-blue"
-        >
+        <RoundButton onClick={() => setAdding(true)} label="Quick add an event">
           <PlusIcon />
-        </button>
+        </RoundButton>
       }
     >
       <div className="px-4 pt-1 pb-1">
@@ -76,6 +73,7 @@ export function EventsScreen() {
         <ErrorState error={error} what="events" onRetry={refresh} />
       )}
 
+      <StaleNotice data={data} />
       {data && <FailureNotice failures={data.failures} />}
 
       {days.length === 0 && !loading && (

@@ -28,25 +28,6 @@ export function isOnboarded() {
   return getProfile().onboarded === true;
 }
 
-/** The four residential dining commons, offered during onboarding. */
-export const DINING_CHOICES = ['Worcester', 'Franklin', 'Hampshire', 'Berkshire'];
-
-/** The best-known retail spots. Matched loosely against live venue names. */
-export const CAFE_CHOICES = [
-  'Blue Wall',
-  "People's Organic Coffee",
-  'Harvest Market',
-  'Tavola',
-  'Green Fields',
-  'Star Ginger',
-  'Wasabi',
-  'Deli Delish',
-  'Yum! Bakery',
-  'Procrastination Station',
-  'Whitmore Café',
-  'Courtside Café',
-];
-
 export const GYM_CHOICES = [
   'Recreation Center',
   'RockWell Climbing Gym',

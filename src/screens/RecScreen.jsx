@@ -9,6 +9,7 @@ import {
   SectionHeader,
   SegmentedControl,
   StatusPill,
+  StaleNotice,
 } from '../components/ui.jsx';
 import { getRec } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
@@ -41,6 +42,7 @@ export function RecScreen() {
 
       {data && (
         <>
+          <StaleNotice data={data} />
           <FailureNotice failures={data.failures} />
 
           {tab === 'facilities' && <Facilities data={data} />}

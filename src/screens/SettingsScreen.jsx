@@ -8,185 +8,245 @@ import {
   SegmentedControl,
   Sheet,
 } from '../components/ui.jsx';
-import { ChipGrid } from './OnboardingScreen.jsx';
+import { PreferencesFlow } from './PreferencesFlow.jsx';
 import { useLocalState } from '../hooks/useLocalState.js';
 import { KEYS, clearAll, usageBytes } from '../lib/storage.js';
 import { FEED_KINDS, deleteFeed, listFeeds, makeFeed, maskUrl, saveFeed } from '../lib/feeds.js';
 import { getCanvasAssignments } from '../lib/api.js';
 import { FONTS, MODES, THEMES, getAppearance, setAppearance } from '../lib/theme.js';
-import {
-  CAFE_CHOICES,
-  DINING_CHOICES,
-  GYM_CHOICES,
-  SPORT_CHOICES,
-  getProfile,
-  setProfile,
-} from '../lib/profile.js';
+import { getProfile } from '../lib/profile.js';
 
+/**
+ * Settings is a short menu rather than one long scroll: each area opens as its
+ * own page, so nothing competes for attention.
+ */
 export function SettingsScreen({ open, onClose }) {
-  const [appearance, setAppearanceState] = useState(getAppearance);
+  const [page, setPage] = useState(null);
   const [done, setDone] = useLocalState(KEYS.doneAssignments, {});
   const [quickEvents, setQuickEvents] = useLocalState(KEYS.quickEvents, []);
+  const [profileRaw] = useLocalState(KEYS.profile, null);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const update = (patch) => setAppearanceState(setAppearance(patch));
+  useEffect(() => {
+    if (!open) setPage(null);
+  }, [open]);
+
+  const profile = getProfile();
+  const feedCount = listFeeds().length;
+  const appearance = getAppearance();
+  const themeName = THEMES.find((t) => t.id === appearance.theme)?.name || 'Classic';
   const kb = (usageBytes() / 1024).toFixed(1);
 
   return (
-    <Sheet open={open} onClose={onClose} title="Settings">
-      <div className="pb-10">
-        <SectionHeader>Appearance</SectionHeader>
-        <div className="px-4">
-          <SegmentedControl
-            options={MODES.map((m) => ({ value: m.id, label: m.name }))}
-            value={appearance.mode}
-            onChange={(mode) => update({ mode })}
+    <>
+      <Sheet open={open} onClose={onClose} title="Settings">
+        <div className="pb-10">
+          <SectionHeader>Setup</SectionHeader>
+          <ListGroup>
+            <Row
+              title="Appearance"
+              subtitle={`${themeName} · ${MODES.find((m) => m.id === appearance.mode)?.name}`}
+              onClick={() => setPage('appearance')}
+            />
+            <Row
+              title="Calendars"
+              subtitle={feedCount ? `${feedCount} connected` : 'Not connected'}
+              onClick={() => setPage('calendars')}
+            />
+            <Row
+              title="Preferences"
+              subtitle={
+                profile.name
+                  ? `${profile.name} · ${(profile.diningFavourites || []).length} places`
+                  : 'Name, food, gym and teams'
+              }
+              onClick={() => setPage('preferences')}
+              last
+            />
+          </ListGroup>
+
+          <SectionHeader>Local Data</SectionHeader>
+          <ListGroup>
+            <Row title="Completed assignments" detail={String(Object.keys(done).length)} />
+            <Row title="Quick-added events" detail={String(quickEvents.length)} />
+            <Row title="Storage used" detail={`${kb} KB`} last />
+          </ListGroup>
+
+          <div className="px-4 pt-4">
+            {confirmClear ? (
+              <div className="rounded-[16px] bg-card p-4">
+                <p className="text-[15px] leading-[20px] text-label">
+                  Clear all check-marks and quick-added events? Your calendars, theme and preferences
+                  stay.
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <Button variant="gray" className="flex-1" onClick={() => setConfirmClear(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => {
+                      clearAll({ keepAuth: true });
+                      setDone({});
+                      setQuickEvents([]);
+                      setConfirmClear(false);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="destructive" className="w-full" onClick={() => setConfirmClear(true)}>
+                Clear local data
+              </Button>
+            )}
+          </div>
+
+          <p className="px-5 pt-6 text-center text-[12px] leading-[16px] text-label-3">
+            Personal build · live from umassdining.com, umass.edu/recwell, events.umass.edu and
+            umassathletics.com
+          </p>
+        </div>
+      </Sheet>
+
+      <Sheet open={page === 'appearance'} onClose={() => setPage(null)} title="Appearance">
+        <AppearancePage />
+      </Sheet>
+
+      <Sheet open={page === 'calendars'} onClose={() => setPage(null)} title="Calendars">
+        <FeedsPage />
+      </Sheet>
+
+      <Sheet open={page === 'preferences'} onClose={() => setPage(null)} title="Preferences">
+        {/* Same questionnaire as first launch, pre-filled with current answers. */}
+        <div className="h-[78vh]">
+          <PreferencesFlow
+            key={String(profileRaw)}
+            onDone={() => setPage(null)}
+            onCancel={() => setPage(null)}
           />
         </div>
-
-        <SectionHeader>Theme</SectionHeader>
-        <div className="grid grid-cols-2 gap-2 px-4">
-          {THEMES.map((theme) => (
-            <button
-              key={theme.id}
-              type="button"
-              onClick={() => update({ theme: theme.id })}
-              className={`ios-press-scale flex items-center gap-3 rounded-[14px] bg-card p-3 text-left ring-inset transition-shadow ${
-                appearance.theme === theme.id ? 'ring-2 ring-ios-blue' : 'ring-0'
-              }`}
-            >
-              <span className="flex shrink-0 -space-x-1.5">
-                {theme.swatch.map((c) => (
-                  <span
-                    key={c}
-                    className="h-[18px] w-[18px] rounded-full border border-card"
-                    style={{ background: c }}
-                  />
-                ))}
-              </span>
-              <span className="truncate text-[15px] font-medium text-label">{theme.name}</span>
-            </button>
-          ))}
-        </div>
-
-        <SectionHeader>Typeface</SectionHeader>
-        <ListGroup>
-          {FONTS.map((font, i) => (
-            <Row
-              key={font.id}
-              last={i === FONTS.length - 1}
-              onClick={() => update({ font: font.id })}
-              trailing={
-                appearance.font === font.id ? (
-                  <span className="text-[17px] font-semibold text-ios-blue">✓</span>
-                ) : null
-              }
-            >
-              <div className="text-[17px] text-label">{font.name}</div>
-              <div className="mt-0.5 text-[13px] text-label-2">{font.hint}</div>
-            </Row>
-          ))}
-        </ListGroup>
-
-        <SectionHeader>Calendars</SectionHeader>
-        <FeedsSetting />
-
-        <SectionHeader>About you</SectionHeader>
-        <ProfileSetting />
-
-        <SectionHeader>Local Data</SectionHeader>
-        <ListGroup>
-          <Row title="Completed assignments" detail={String(Object.keys(done).length)} />
-          <Row title="Quick-added events" detail={String(quickEvents.length)} />
-          <Row title="Storage used" detail={`${kb} KB`} last />
-        </ListGroup>
-
-        <div className="px-4 pt-4">
-          {confirmClear ? (
-            <div className="rounded-[16px] bg-card p-4">
-              <p className="text-[15px] leading-[20px] text-label">
-                Clear all check-marks and quick-added events? Your calendars, theme and preferences stay.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <Button variant="gray" className="flex-1" onClick={() => setConfirmClear(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={() => {
-                    clearAll({ keepAuth: true });
-                    setDone({});
-                    setQuickEvents([]);
-                    setConfirmClear(false);
-                  }}
-                >
-                  Clear
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button variant="destructive" className="w-full" onClick={() => setConfirmClear(true)}>
-              Clear local data
-            </Button>
-          )}
-        </div>
-
-        <p className="px-5 pt-6 text-center text-[12px] leading-[16px] text-label-3">
-          Personal build · data read live from umassdining.com, umass.edu/recwell, events.umass.edu and
-          umassathletics.com
-        </p>
-      </div>
-    </Sheet>
+      </Sheet>
+    </>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Calendar feeds                                                              */
+
+function AppearancePage() {
+  const [appearance, setState] = useState(getAppearance);
+  const update = (patch) => setState(setAppearance(patch));
+
+  return (
+    <div className="pb-10">
+      <SectionHeader>Mode</SectionHeader>
+      <div className="px-4">
+        <SegmentedControl
+          options={MODES.map((m) => ({ value: m.id, label: m.name }))}
+          value={appearance.mode}
+          onChange={(mode) => update({ mode })}
+        />
+      </div>
+      <p className="px-5 pt-2 text-[12px] leading-[16px] text-label-3">
+        System follows your iPhone’s light/dark setting.
+      </p>
+
+      <SectionHeader>Theme</SectionHeader>
+      <div className="grid grid-cols-2 gap-2 px-4">
+        {THEMES.map((theme) => (
+          <button
+            key={theme.id}
+            type="button"
+            onClick={() => update({ theme: theme.id })}
+            className={`ios-press-scale flex items-center gap-3 rounded-[14px] bg-card p-3 text-left ring-inset transition-shadow ${
+              appearance.theme === theme.id ? 'ring-2 ring-ios-blue' : 'ring-0'
+            }`}
+          >
+            <span className="flex shrink-0 -space-x-1.5">
+              {theme.swatch.map((c) => (
+                <span
+                  key={c}
+                  className="h-[18px] w-[18px] rounded-full border border-card"
+                  style={{ background: c }}
+                />
+              ))}
+            </span>
+            <span className="truncate text-[15px] font-medium text-label">{theme.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <SectionHeader>Font</SectionHeader>
+      <ListGroup>
+        {FONTS.map((font, i) => (
+          <Row
+            key={font.id}
+            last={i === FONTS.length - 1}
+            onClick={() => update({ font: font.id })}
+            trailing={
+              appearance.font === font.id ? (
+                <span className="text-[17px] font-semibold text-ios-blue">✓</span>
+              ) : null
+            }
+          >
+            <div className="text-[17px] text-label">{font.name}</div>
+            <div className="mt-0.5 text-[13px] text-label-2">{font.hint}</div>
+          </Row>
+        ))}
+      </ListGroup>
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 
-function FeedsSetting() {
+function FeedsPage() {
   const [feeds, setFeeds] = useState(listFeeds);
   const [adding, setAdding] = useState(false);
 
   return (
-    <>
+    <div className="pb-10">
       {feeds.length > 0 && (
-        <ListGroup>
-          {feeds.map((feed, i) => (
-            <Row
-              key={feed.id}
-              last={i === feeds.length - 1}
-              trailing={
-                <button
-                  type="button"
-                  onClick={() => setFeeds(deleteFeed(feed.id))}
-                  className="ios-press-scale text-[15px] text-ios-red"
-                >
-                  Remove
-                </button>
-              }
-            >
-              <div className="flex items-center gap-2">
-                <span className="truncate text-[17px] text-label">{feed.label}</span>
-                <Badge tone={FEED_KINDS[feed.kind]?.tone || 'gray'}>
-                  {FEED_KINDS[feed.kind]?.label || 'Calendar'}
-                </Badge>
-              </div>
-              <div className="mt-0.5 truncate text-[12px] text-label-2">{maskUrl(feed.url)}</div>
-            </Row>
-          ))}
-        </ListGroup>
+        <>
+          <SectionHeader>Connected</SectionHeader>
+          <ListGroup>
+            {feeds.map((feed, i) => (
+              <Row
+                key={feed.id}
+                last={i === feeds.length - 1}
+                trailing={
+                  <button
+                    type="button"
+                    onClick={() => setFeeds(deleteFeed(feed.id))}
+                    className="ios-press-scale text-[15px] text-ios-red"
+                  >
+                    Remove
+                  </button>
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-[17px] text-label">{feed.label}</span>
+                  <Badge tone={FEED_KINDS[feed.kind]?.tone || 'gray'}>
+                    {FEED_KINDS[feed.kind]?.label || 'Calendar'}
+                  </Badge>
+                </div>
+                <div className="mt-0.5 truncate text-[12px] text-label-2">{maskUrl(feed.url)}</div>
+              </Row>
+            ))}
+          </ListGroup>
+        </>
       )}
 
-      <div className="px-4 pt-3">
+      <div className="px-4 pt-4">
         <Button variant="tinted" className="w-full" onClick={() => setAdding(true)}>
           Add a calendar
         </Button>
       </div>
 
       {feeds.length === 0 && (
-        <p className="px-5 pt-2 text-[12px] leading-[16px] text-label-3">
+        <p className="px-5 pt-3 text-[13px] leading-[18px] text-label-2">
           Add your Canvas feed for assignments, or a Google Calendar feed to bring across both Canvas
           and anything you add yourself.
         </p>
@@ -200,7 +260,7 @@ function FeedsSetting() {
           setAdding(false);
         }}
       />
-    </>
+    </div>
   );
 }
 
@@ -273,31 +333,27 @@ function AddFeedSheet({ open, onClose, onSaved }) {
           )}
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-[16px] bg-card">
-          <div className="relative px-4 py-3" style={{ '--sep-inset': '16px' }}>
-            <input
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder={spec.placeholder}
-              className="w-full bg-transparent text-[15px] text-label placeholder:text-label-3 focus:outline-none"
-            />
-          </div>
+        <div className="mt-4 overflow-hidden rounded-[16px] bg-card px-4 py-3">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder={spec.placeholder}
+            className="w-full bg-transparent text-[15px] text-label placeholder:text-label-3 focus:outline-none"
+          />
         </div>
 
-        <div className="mt-3 overflow-hidden rounded-[16px] bg-card">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <span className="w-[64px] shrink-0 text-[15px] text-label-2">Name</span>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={spec.label}
-              className="w-full bg-transparent text-[17px] text-label placeholder:text-label-3 focus:outline-none"
-            />
-          </div>
+        <div className="mt-3 flex items-center gap-3 overflow-hidden rounded-[16px] bg-card px-4 py-3">
+          <span className="w-[64px] shrink-0 text-[15px] text-label-2">Name</span>
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={spec.label}
+            className="w-full bg-transparent text-[17px] text-label placeholder:text-label-3 focus:outline-none"
+          />
         </div>
 
         <Button className="mt-5 w-full" onClick={connect} disabled={state.status === 'checking'}>
@@ -320,77 +376,5 @@ function AddFeedSheet({ open, onClose, onSaved }) {
         </p>
       </div>
     </Sheet>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Profile                                                                     */
-/* -------------------------------------------------------------------------- */
-
-function ProfileSetting() {
-  const [profile, setLocal] = useState(getProfile);
-
-  const patch = (next) => setLocal(setProfile(next));
-
-  const toggle = (key, value) => {
-    const list = profile[key] || [];
-    patch({ [key]: list.includes(value) ? list.filter((v) => v !== value) : [...list, value] });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="mx-4 overflow-hidden rounded-[16px] bg-card">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="w-[64px] shrink-0 text-[15px] text-label-2">Name</span>
-          <input
-            value={profile.name}
-            onChange={(e) => patch({ name: e.target.value })}
-            placeholder="Your name"
-            className="w-full bg-transparent text-[17px] text-label placeholder:text-label-3 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      <ProfileGroup title="Dining commons">
-        <ChipGrid
-          options={DINING_CHOICES}
-          selected={profile.diningFavourites || []}
-          onToggle={(v) => toggle('diningFavourites', v)}
-        />
-      </ProfileGroup>
-
-      <ProfileGroup title="Cafes">
-        <ChipGrid
-          options={CAFE_CHOICES}
-          selected={profile.cafeFavourites || []}
-          onToggle={(v) => toggle('cafeFavourites', v)}
-        />
-      </ProfileGroup>
-
-      <ProfileGroup title="Gym">
-        <ChipGrid
-          options={GYM_CHOICES}
-          selected={profile.gymFavourite ? [profile.gymFavourite] : []}
-          onToggle={(v) => patch({ gymFavourite: profile.gymFavourite === v ? '' : v })}
-        />
-      </ProfileGroup>
-
-      <ProfileGroup title="Teams you follow">
-        <ChipGrid
-          options={SPORT_CHOICES}
-          selected={profile.sports || []}
-          onToggle={(v) => toggle('sports', v)}
-        />
-      </ProfileGroup>
-    </div>
-  );
-}
-
-function ProfileGroup({ title, children }) {
-  return (
-    <div className="px-4">
-      <h3 className="pb-2 text-[13px] font-medium text-label-2">{title}</h3>
-      {children}
-    </div>
   );
 }

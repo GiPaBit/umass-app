@@ -1,23 +1,41 @@
 /**
- * Offline shell only.
+ * App-shell service worker.
  *
- * The app is meant to show live data, so /api requests are always network-first
- * and never served stale. The service worker exists so that launching from the
- * home screen with no signal still opens the UI instead of a Safari error page.
+ * The previous version cached `/index.html` but not the hashed JS bundle it
+ * points at, so opening with the server unreachable produced a blank page —
+ * HTML with no script. This one refuses to serve a cached page unless the
+ * matching build assets are cached too, and it versions itself per build.
+ *
+ * API responses are never cached here; freshness is handled in src/lib/api.js,
+ * which keeps a per-endpoint snapshot and marks it stale when it falls back.
  */
-const CACHE = 'umass-shell-v1';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png'];
+const VERSION = 'v3';
+const SHELL = `umass-shell-${VERSION}`;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(SHELL);
+      // Pull the built asset URLs out of index.html rather than hard-coding
+      // hashed filenames that change every build.
+      const res = await fetch('/index.html', { cache: 'reload' });
+      const html = await res.text();
+      const assets = [...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css))"/g)].map((m) => m[1]);
+
+      await cache.put('/index.html', new Response(html, { headers: res.headers }));
+      await cache.addAll([...new Set([...assets, '/manifest.webmanifest', '/icons/icon-192.png'])]);
+      await self.skipWaiting();
+    })(),
+  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
   );
 });
 
@@ -26,24 +44,32 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // let Google / images go straight to the network
+  if (url.origin !== self.location.origin) return; // Google, images: straight to the network
   if (url.pathname.startsWith('/api/')) return; // always live
 
-  // Navigations: try the network, fall back to the cached shell when offline.
+  // Navigations: network first, cached shell only as a fallback.
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(SHELL).then((c) => c.put('/index.html', copy));
+          return res;
+        })
+        .catch(async () => (await caches.match('/index.html')) || Response.error()),
+    );
     return;
   }
 
-  // Static assets: serve from cache, refill in the background.
+  // Static assets: cache first, refill in the background.
   event.respondWith(
     caches.match(request).then(
       (hit) =>
         hit ||
         fetch(request).then((res) => {
-          if (res.ok) {
+          if (res.ok && res.type === 'basic') {
             const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(request, copy));
+            caches.open(SHELL).then((c) => c.put(request, copy));
           }
           return res;
         }),

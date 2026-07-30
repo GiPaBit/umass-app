@@ -6,9 +6,12 @@ export const THEMES = [
   { id: 'ocean', name: 'Ocean', swatch: ['#0b72c4', '#00a0b0', '#04121f'] },
   { id: 'dunes', name: 'Dunes', swatch: ['#c2701b', '#f0a13c', '#3b2408'] },
   { id: 'forest', name: 'Forest', swatch: ['#217a45', '#9ad14e', '#06120b'] },
-  { id: 'rainbow', name: 'Rainbow', swatch: ['#8b3fd4', '#ff6b9d', '#f7b733'] },
-  { id: 'sparkle', name: 'Sparkle', swatch: ['#d6337f', '#a855f7', '#ffd1e7'] },
+  { id: 'wildflowers', name: 'Wildflowers', swatch: ['#8b3fd4', '#ff6b9d', '#f7b733'] },
+  { id: 'blossom', name: 'Cherry Blossom', swatch: ['#d1567c', '#ffc5d5', '#8a9e7c'] },
 ];
+
+/** Themes that were renamed after release — keeps a saved preference working. */
+const THEME_ALIASES = { rainbow: 'wildflowers', sparkle: 'blossom' };
 
 /** Typeface options. On Apple devices these map to the real system families. */
 export const FONTS = [
@@ -31,7 +34,10 @@ export function getAppearance() {
   const saved = read(KEYS.theme, null);
   // Older builds stored just the mode string.
   if (typeof saved === 'string') return { ...DEFAULTS, mode: saved };
-  return { ...DEFAULTS, ...(saved || {}) };
+
+  const merged = { ...DEFAULTS, ...(saved || {}) };
+  merged.theme = THEME_ALIASES[merged.theme] || merged.theme;
+  return merged;
 }
 
 export function setAppearance(patch) {

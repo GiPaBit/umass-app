@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
-import { Button, Spinner } from '../components/ui.jsx';
+import { Button, RoundButton, Spinner, StaleNotice } from '../components/ui.jsx';
 import { GearIcon } from '../components/Icons.jsx';
 import { TypedBrief } from '../components/TypedBrief.jsx';
 import { getDiningOverview, getEvents, getRec } from '../lib/api.js';
@@ -83,14 +83,9 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
       subtitle={dateLine}
       onRefresh={refresh}
       trailing={
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          aria-label="Settings"
-          className="ios-press-scale -m-1 p-1 text-ios-blue"
-        >
+        <RoundButton onClick={onOpenSettings} label="Settings">
           <GearIcon />
-        </button>
+        </RoundButton>
       }
     >
       {!ready ? (

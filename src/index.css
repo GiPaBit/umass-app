@@ -133,8 +133,8 @@
   --d-chrome: rgba(9, 26, 16, 0.84);
 }
 
-/* --- Rainbow: bright and playful (gradient accents) ----------------------- */
-:root[data-theme='rainbow'] {
+/* --- Wildflowers: meadow purples, coral and pollen yellow ----------------- */
+:root[data-theme='wildflowers'] {
   --l-bg: #f7f2fb;
   --l-elevated: #ffffff;
   --l-card: #ffffff;
@@ -164,35 +164,35 @@
   --d-chrome: rgba(16, 8, 24, 0.84);
 }
 
-/* --- Sparkle: pink, high shine -------------------------------------------- */
-:root[data-theme='sparkle'] {
-  --l-bg: #fdeef5;
+/* --- Cherry Blossom: pale sakura pink, warm bark, soft leaf --------------- */
+:root[data-theme='blossom'] {
+  --l-bg: #fdf3f5;
   --l-elevated: #ffffff;
   --l-card: #ffffff;
-  --l-card-alt: #fbdfeb;
-  --l-separator: rgba(158, 32, 90, 0.2);
-  --l-fill: rgba(214, 51, 128, 0.1);
-  --l-fill-strong: rgba(214, 51, 128, 0.2);
-  --l-label: #3d0a22;
-  --l-label-2: rgba(61, 10, 34, 0.62);
-  --l-label-3: rgba(61, 10, 34, 0.32);
-  --l-accent: #d6337f;
-  --l-accent-2: #a855f7;
-  --l-chrome: rgba(253, 238, 245, 0.84);
+  --l-card-alt: #fbe3e9;
+  --l-separator: rgba(122, 58, 74, 0.18);
+  --l-fill: rgba(209, 86, 124, 0.09);
+  --l-fill-strong: rgba(209, 86, 124, 0.18);
+  --l-label: #40222a;
+  --l-label-2: rgba(64, 34, 42, 0.6);
+  --l-label-3: rgba(64, 34, 42, 0.3);
+  --l-accent: #d1567c;
+  --l-accent-2: #8a9e7c;
+  --l-chrome: rgba(253, 243, 245, 0.84);
 
-  --d-bg: #150610;
-  --d-elevated: #290f1e;
-  --d-card: #290f1e;
-  --d-card-alt: #3a172a;
-  --d-separator: rgba(255, 173, 214, 0.24);
-  --d-fill: rgba(255, 173, 214, 0.14);
-  --d-fill-strong: rgba(255, 173, 214, 0.24);
-  --d-label: #ffeef6;
-  --d-label-2: rgba(255, 209, 231, 0.66);
-  --d-label-3: rgba(255, 209, 231, 0.34);
-  --d-accent: #ff6cae;
-  --d-accent-2: #c98bff;
-  --d-chrome: rgba(22, 8, 16, 0.84);
+  --d-bg: #16090d;
+  --d-elevated: #2a151b;
+  --d-card: #2a151b;
+  --d-card-alt: #3b1f27;
+  --d-separator: rgba(255, 197, 213, 0.22);
+  --d-fill: rgba(255, 197, 213, 0.13);
+  --d-fill-strong: rgba(255, 197, 213, 0.22);
+  --d-label: #fff0f4;
+  --d-label-2: rgba(255, 214, 226, 0.64);
+  --d-label-3: rgba(255, 214, 226, 0.32);
+  --d-accent: #ff9ab5;
+  --d-accent-2: #a8c49a;
+  --d-chrome: rgba(24, 11, 15, 0.84);
 }
 
 /* ===========================================================================
@@ -200,6 +200,17 @@
    Maps the active half of the theme onto the tokens the app consumes.
    `.light` / `.dark` on <html> beat the OS preference in both directions.
    =========================================================================== */
+
+/* Map ink, derived per mode so the campus matches the active theme. */
+:root {
+  --map-ground: color-mix(in srgb, var(--c-bg) 78%, var(--c-fill));
+  --map-building: color-mix(in srgb, var(--c-label) 13%, var(--c-bg));
+  --map-building-edge: color-mix(in srgb, var(--c-label) 22%, var(--c-bg));
+  --map-road: var(--c-bg-elevated);
+  --map-road-casing: color-mix(in srgb, var(--c-label) 14%, var(--c-bg));
+  --map-water: color-mix(in srgb, var(--c-blue) 34%, var(--c-bg));
+  --map-water-edge: color-mix(in srgb, var(--c-blue) 55%, var(--c-bg));
+}
 
 :root {
   --c-bg: var(--l-bg);
@@ -453,9 +464,9 @@ button,
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Rainbow and Sparkle get a gradient headline; other themes fall back to plain. */
-:root[data-theme='rainbow'] .brand-gradient,
-:root[data-theme='sparkle'] .brand-gradient {
+/* The two floral themes get a gradient headline; others fall back to plain. */
+:root[data-theme='wildflowers'] .brand-gradient,
+:root[data-theme='blossom'] .brand-gradient {
   background-image: linear-gradient(100deg, var(--c-blue), var(--c-indigo), var(--c-pink));
   background-clip: text;
   -webkit-background-clip: text;

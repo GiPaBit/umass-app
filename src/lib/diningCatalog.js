@@ -51,13 +51,18 @@ export const DINING_GROUPS = [
     // Deliberately does NOT select everything: these are all over the place.
     selectAllOnGroup: false,
     venues: [
-      { name: 'Harvest Market', lat: 42.391682, lon: -72.526792 },
-      { name: "People's Organic Coffee", lat: 42.391661, lon: -72.527083 },
-      { name: 'The Commonwealth Restaurant', lat: 42.391661, lon: -72.527083 },
-      { name: 'Worcester Café', lat: 42.393015, lon: -72.525092 },
+      // Co-located with each other, but far enough from the Blue Wall coordinate
+      // below to stay a distinct pin rather than being swallowed into it.
+      { name: 'Harvest Market', lat: 42.39175, lon: -72.52676 },
+      { name: "People's Organic Coffee", lat: 42.39175, lon: -72.52676 },
+      // On the top floor of Worcester Commons — shares the hall's coordinate so
+      // it clusters into the one Worcester pin along with the café and grab'n go.
+      { name: 'The Commonwealth Restaurant', lat: 42.393256, lon: -72.525107 },
+      { name: 'Worcester Café', lat: 42.393256, lon: -72.525107 },
       { name: 'Whitmore Café', lat: 42.385785, lon: -72.526834 },
       { name: 'Procrastination Station', lat: 42.389915, lon: -72.528317 },
-      { name: 'Argo Tea', lat: 42.389915, lon: -72.528317 },
+      // Hampden Building, Southwest — next to Berkshire, not in the library.
+      { name: 'Argo Tea', lat: 42.3824, lon: -72.5294 },
       { name: 'Roots Café', lat: 42.38816, lon: -72.530473 },
       { name: 'Courtside Café', lat: 42.389157, lon: -72.531676 },
       { name: 'ISB Café', lat: 42.392673, lon: -72.524785 },

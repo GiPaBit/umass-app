@@ -235,7 +235,9 @@ export function composeWeekBrief({ profile, assignments = [], events = [] }) {
   const upcomingEvents = events.filter((e) => inWindow(e.start));
   const games = upcomingEvents.filter((e) => e.source === 'athletics');
   const myGames = games.filter((e) => matchesSports(e, profile?.sports));
-  const showGames = myGames.length ? myGames : games;
+  // Only fall back to "any game" when the user hasn't picked teams to follow —
+  // once they have, an empty match should mean silence, not someone else's team.
+  const showGames = profile?.sports?.length ? myGames : games;
 
   if (showGames.length) {
     const g = showGames[0];

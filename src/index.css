@@ -1,0 +1,593 @@
+@import 'tailwindcss';
+
+/* ===========================================================================
+   THEMES
+
+   Each theme declares only light (`--l-*`) and dark (`--d-*`) pairs. A single
+   resolver below maps whichever half is active onto the `--c-*` tokens the app
+   actually uses, so adding a theme never means duplicating the light/dark logic.
+   =========================================================================== */
+
+/* --- Default: Apple's system palette -------------------------------------- */
+:root,
+:root[data-theme='default'] {
+  --l-bg: #f2f2f7;
+  --l-elevated: #ffffff;
+  --l-card: #ffffff;
+  --l-card-alt: #f2f2f7;
+  --l-separator: rgba(60, 60, 67, 0.29);
+  --l-fill: rgba(120, 120, 128, 0.12);
+  --l-fill-strong: rgba(120, 120, 128, 0.2);
+  --l-label: #000000;
+  --l-label-2: rgba(60, 60, 67, 0.6);
+  --l-label-3: rgba(60, 60, 67, 0.3);
+  --l-accent: #007aff;
+  --l-accent-2: #5856d6;
+  --l-chrome: rgba(249, 249, 249, 0.82);
+
+  --d-bg: #000000;
+  --d-elevated: #1c1c1e;
+  --d-card: #1c1c1e;
+  --d-card-alt: #2c2c2e;
+  --d-separator: rgba(84, 84, 88, 0.6);
+  --d-fill: rgba(120, 120, 128, 0.24);
+  --d-fill-strong: rgba(120, 120, 128, 0.36);
+  --d-label: #ffffff;
+  --d-label-2: rgba(235, 235, 245, 0.6);
+  --d-label-3: rgba(235, 235, 245, 0.3);
+  --d-accent: #0a84ff;
+  --d-accent-2: #5e5ce6;
+  --d-chrome: rgba(30, 30, 32, 0.8);
+}
+
+/* --- Ocean: deep blues and teals ------------------------------------------ */
+:root[data-theme='ocean'] {
+  --l-bg: #eaf2fa;
+  --l-elevated: #ffffff;
+  --l-card: #ffffff;
+  --l-card-alt: #dcebf8;
+  --l-separator: rgba(12, 74, 110, 0.22);
+  --l-fill: rgba(14, 116, 165, 0.1);
+  --l-fill-strong: rgba(14, 116, 165, 0.18);
+  --l-label: #06283d;
+  --l-label-2: rgba(6, 40, 61, 0.62);
+  --l-label-3: rgba(6, 40, 61, 0.32);
+  --l-accent: #0b72c4;
+  --l-accent-2: #00a0b0;
+  --l-chrome: rgba(234, 242, 250, 0.82);
+
+  --d-bg: #04121f;
+  --d-elevated: #0c2236;
+  --d-card: #0c2236;
+  --d-card-alt: #123049;
+  --d-separator: rgba(125, 190, 232, 0.24);
+  --d-fill: rgba(125, 190, 232, 0.14);
+  --d-fill-strong: rgba(125, 190, 232, 0.24);
+  --d-label: #eaf6ff;
+  --d-label-2: rgba(198, 227, 247, 0.66);
+  --d-label-3: rgba(198, 227, 247, 0.34);
+  --d-accent: #47b6ff;
+  --d-accent-2: #2fd8d0;
+  --d-chrome: rgba(8, 28, 46, 0.82);
+}
+
+/* --- Dunes: warm sand, amber and terracotta ------------------------------- */
+:root[data-theme='dunes'] {
+  --l-bg: #faf1e2;
+  --l-elevated: #fffaf2;
+  --l-card: #fffaf2;
+  --l-card-alt: #f3e4cd;
+  --l-separator: rgba(124, 79, 26, 0.22);
+  --l-fill: rgba(180, 116, 40, 0.12);
+  --l-fill-strong: rgba(180, 116, 40, 0.22);
+  --l-label: #3b2408;
+  --l-label-2: rgba(59, 36, 8, 0.62);
+  --l-label-3: rgba(59, 36, 8, 0.32);
+  --l-accent: #c2701b;
+  --l-accent-2: #a8511f;
+  --l-chrome: rgba(250, 241, 226, 0.84);
+
+  --d-bg: #170f06;
+  --d-elevated: #2a1d0d;
+  --d-card: #2a1d0d;
+  --d-card-alt: #3a2913;
+  --d-separator: rgba(238, 196, 137, 0.24);
+  --d-fill: rgba(238, 196, 137, 0.14);
+  --d-fill-strong: rgba(238, 196, 137, 0.24);
+  --d-label: #fdf1de;
+  --d-label-2: rgba(245, 219, 183, 0.66);
+  --d-label-3: rgba(245, 219, 183, 0.34);
+  --d-accent: #f0a13c;
+  --d-accent-2: #e2703a;
+  --d-chrome: rgba(28, 19, 8, 0.84);
+}
+
+/* --- Forest: deep greens and moss ----------------------------------------- */
+:root[data-theme='forest'] {
+  --l-bg: #ecf3ec;
+  --l-elevated: #ffffff;
+  --l-card: #ffffff;
+  --l-card-alt: #dcebdc;
+  --l-separator: rgba(22, 66, 38, 0.22);
+  --l-fill: rgba(35, 104, 60, 0.11);
+  --l-fill-strong: rgba(35, 104, 60, 0.2);
+  --l-label: #0f2a19;
+  --l-label-2: rgba(15, 42, 25, 0.62);
+  --l-label-3: rgba(15, 42, 25, 0.32);
+  --l-accent: #217a45;
+  --l-accent-2: #5a8f2f;
+  --l-chrome: rgba(236, 243, 236, 0.84);
+
+  --d-bg: #06120b;
+  --d-elevated: #102317;
+  --d-card: #102317;
+  --d-card-alt: #17301f;
+  --d-separator: rgba(146, 214, 168, 0.22);
+  --d-fill: rgba(146, 214, 168, 0.13);
+  --d-fill-strong: rgba(146, 214, 168, 0.22);
+  --d-label: #e8f6ec;
+  --d-label-2: rgba(200, 232, 210, 0.66);
+  --d-label-3: rgba(200, 232, 210, 0.34);
+  --d-accent: #4ec97b;
+  --d-accent-2: #9ad14e;
+  --d-chrome: rgba(9, 26, 16, 0.84);
+}
+
+/* --- Rainbow: bright and playful (gradient accents) ----------------------- */
+:root[data-theme='rainbow'] {
+  --l-bg: #f7f2fb;
+  --l-elevated: #ffffff;
+  --l-card: #ffffff;
+  --l-card-alt: #f0e8fa;
+  --l-separator: rgba(88, 42, 128, 0.2);
+  --l-fill: rgba(140, 82, 200, 0.1);
+  --l-fill-strong: rgba(140, 82, 200, 0.2);
+  --l-label: #241432;
+  --l-label-2: rgba(36, 20, 50, 0.62);
+  --l-label-3: rgba(36, 20, 50, 0.32);
+  --l-accent: #8b3fd4;
+  --l-accent-2: #ff6b9d;
+  --l-chrome: rgba(247, 242, 251, 0.84);
+
+  --d-bg: #0e0716;
+  --d-elevated: #1d1029;
+  --d-card: #1d1029;
+  --d-card-alt: #2a1a3b;
+  --d-separator: rgba(214, 173, 255, 0.24);
+  --d-fill: rgba(214, 173, 255, 0.14);
+  --d-fill-strong: rgba(214, 173, 255, 0.24);
+  --d-label: #f6eeff;
+  --d-label-2: rgba(226, 208, 245, 0.66);
+  --d-label-3: rgba(226, 208, 245, 0.34);
+  --d-accent: #c07cff;
+  --d-accent-2: #ff8ab5;
+  --d-chrome: rgba(16, 8, 24, 0.84);
+}
+
+/* --- Sparkle: pink, high shine -------------------------------------------- */
+:root[data-theme='sparkle'] {
+  --l-bg: #fdeef5;
+  --l-elevated: #ffffff;
+  --l-card: #ffffff;
+  --l-card-alt: #fbdfeb;
+  --l-separator: rgba(158, 32, 90, 0.2);
+  --l-fill: rgba(214, 51, 128, 0.1);
+  --l-fill-strong: rgba(214, 51, 128, 0.2);
+  --l-label: #3d0a22;
+  --l-label-2: rgba(61, 10, 34, 0.62);
+  --l-label-3: rgba(61, 10, 34, 0.32);
+  --l-accent: #d6337f;
+  --l-accent-2: #a855f7;
+  --l-chrome: rgba(253, 238, 245, 0.84);
+
+  --d-bg: #150610;
+  --d-elevated: #290f1e;
+  --d-card: #290f1e;
+  --d-card-alt: #3a172a;
+  --d-separator: rgba(255, 173, 214, 0.24);
+  --d-fill: rgba(255, 173, 214, 0.14);
+  --d-fill-strong: rgba(255, 173, 214, 0.24);
+  --d-label: #ffeef6;
+  --d-label-2: rgba(255, 209, 231, 0.66);
+  --d-label-3: rgba(255, 209, 231, 0.34);
+  --d-accent: #ff6cae;
+  --d-accent-2: #c98bff;
+  --d-chrome: rgba(22, 8, 16, 0.84);
+}
+
+/* ===========================================================================
+   LIGHT / DARK RESOLVER
+   Maps the active half of the theme onto the tokens the app consumes.
+   `.light` / `.dark` on <html> beat the OS preference in both directions.
+   =========================================================================== */
+
+:root {
+  --c-bg: var(--l-bg);
+  --c-bg-elevated: var(--l-elevated);
+  --c-card: var(--l-card);
+  --c-card-alt: var(--l-card-alt);
+  --c-separator: var(--l-separator);
+  --c-fill: var(--l-fill);
+  --c-fill-strong: var(--l-fill-strong);
+  --c-label: var(--l-label);
+  --c-label-secondary: var(--l-label-2);
+  --c-label-tertiary: var(--l-label-3);
+  --c-blue: var(--l-accent);
+  --c-indigo: var(--l-accent-2);
+  --c-chrome: var(--l-chrome);
+
+  /* Status colours stay recognisable across themes. */
+  --c-green: #34c759;
+  --c-red: #ff3b30;
+  --c-orange: #ff9500;
+  --c-yellow: #ffcc00;
+  --c-purple: #af52de;
+  --c-teal: #30b0c7;
+  --c-pink: #ff2d55;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --c-bg: var(--d-bg);
+    --c-bg-elevated: var(--d-elevated);
+    --c-card: var(--d-card);
+    --c-card-alt: var(--d-card-alt);
+    --c-separator: var(--d-separator);
+    --c-fill: var(--d-fill);
+    --c-fill-strong: var(--d-fill-strong);
+    --c-label: var(--d-label);
+    --c-label-secondary: var(--d-label-2);
+    --c-label-tertiary: var(--d-label-3);
+    --c-blue: var(--d-accent);
+    --c-indigo: var(--d-accent-2);
+    --c-chrome: var(--d-chrome);
+
+    --c-green: #32d74b;
+    --c-red: #ff453a;
+    --c-orange: #ff9f0a;
+    --c-yellow: #ffd60a;
+    --c-purple: #bf5af2;
+    --c-teal: #40c8e0;
+    --c-pink: #ff375f;
+
+    color-scheme: dark;
+  }
+}
+
+:root.dark {
+  --c-bg: var(--d-bg);
+  --c-bg-elevated: var(--d-elevated);
+  --c-card: var(--d-card);
+  --c-card-alt: var(--d-card-alt);
+  --c-separator: var(--d-separator);
+  --c-fill: var(--d-fill);
+  --c-fill-strong: var(--d-fill-strong);
+  --c-label: var(--d-label);
+  --c-label-secondary: var(--d-label-2);
+  --c-label-tertiary: var(--d-label-3);
+  --c-blue: var(--d-accent);
+  --c-indigo: var(--d-accent-2);
+  --c-chrome: var(--d-chrome);
+
+  --c-green: #32d74b;
+  --c-red: #ff453a;
+  --c-orange: #ff9f0a;
+  --c-yellow: #ffd60a;
+  --c-purple: #bf5af2;
+  --c-teal: #40c8e0;
+  --c-pink: #ff375f;
+
+  color-scheme: dark;
+}
+
+/* ===========================================================================
+   FONTS  — set via data-font on <html>
+   =========================================================================== */
+
+:root,
+:root[data-font='system'] {
+  --font-app: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue',
+    sans-serif;
+  --font-display: var(--font-app);
+  --tracking-display: -0.4px;
+}
+
+/* SF Pro Rounded on Apple platforms — soft and friendly. */
+:root[data-font='rounded'] {
+  --font-app: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-app);
+  --tracking-display: -0.3px;
+}
+
+/* New York on Apple platforms — editorial. */
+:root[data-font='serif'] {
+  --font-app: ui-serif, 'New York', Georgia, 'Times New Roman', serif;
+  --font-display: var(--font-app);
+  --tracking-display: -0.2px;
+}
+
+/* Serif headlines over a sans body — magazine feel, still readable in lists. */
+:root[data-font='editorial'] {
+  --font-app: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --font-display: ui-serif, 'New York', Georgia, serif;
+  --tracking-display: -0.2px;
+}
+
+:root[data-font='mono'] {
+  --font-app: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display: var(--font-app);
+  --tracking-display: -0.5px;
+}
+
+/* =========================================================================== */
+
+@theme {
+  --color-bg: var(--c-bg);
+  --color-bg-elevated: var(--c-bg-elevated);
+  --color-card: var(--c-card);
+  --color-card-alt: var(--c-card-alt);
+  --color-separator: var(--c-separator);
+  --color-fill: var(--c-fill);
+  --color-fill-strong: var(--c-fill-strong);
+
+  --color-label: var(--c-label);
+  --color-label-2: var(--c-label-secondary);
+  --color-label-3: var(--c-label-tertiary);
+
+  --color-ios-blue: var(--c-blue);
+  --color-ios-green: var(--c-green);
+  --color-ios-red: var(--c-red);
+  --color-ios-orange: var(--c-orange);
+  --color-ios-yellow: var(--c-yellow);
+  --color-ios-purple: var(--c-purple);
+  --color-ios-teal: var(--c-teal);
+  --color-ios-indigo: var(--c-indigo);
+  --color-ios-pink: var(--c-pink);
+
+  --font-sans: var(--font-app);
+
+  --radius-ios: 10px;
+  --radius-card: 16px;
+  --radius-card-lg: 20px;
+
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ===========================================================================
+   BASE
+   =========================================================================== */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/*
+  Pinned to the viewport rather than sized at 100%.
+  In an iOS standalone PWA a percentage height resolves against a layout viewport
+  that does not match the screen, so the page itself could scroll a little —
+  which pushed content up, hid the large title behind the nav bar and left a gap
+  above the home indicator. `fixed` + `inset: 0` removes that entirely.
+*/
+#root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-label);
+  font-family: var(--font-app);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role='button'] {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.ios-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.ios-blur {
+  background: var(--c-chrome);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Hairline separators — 0.5px on retina, inset from the left like a UITableView. */
+.ios-separator::after {
+  content: '';
+  position: absolute;
+  left: var(--sep-inset, 16px);
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  transform: scaleY(0.5);
+  transform-origin: bottom;
+  background: var(--c-separator);
+}
+
+.ios-press {
+  transition: background-color 120ms var(--ease-ios), transform 200ms var(--ease-ios), opacity 120ms;
+}
+.ios-press:active {
+  background-color: var(--c-fill);
+}
+
+.ios-press-scale:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Rainbow and Sparkle get a gradient headline; other themes fall back to plain. */
+:root[data-theme='rainbow'] .brand-gradient,
+:root[data-theme='sparkle'] .brand-gradient {
+  background-image: linear-gradient(100deg, var(--c-blue), var(--c-indigo), var(--c-pink));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* ===========================================================================
+   MOTION
+   =========================================================================== */
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.screen-enter {
+  animation: screen-in 320ms var(--ease-ios) both;
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sheet-enter {
+  animation: sheet-in 420ms var(--ease-ios) both;
+}
+
+.backdrop-enter {
+  animation: backdrop-in 300ms ease both;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 800ms linear infinite;
+}
+
+/* --- Completed assignments: the rule sweeps across, then the row fades ----- */
+.strike {
+  position: relative;
+  display: inline;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 60%;
+  background-size: 0% 1.5px;
+  transition: background-size 420ms var(--ease-ios);
+}
+
+.strike-on {
+  background-size: 100% 1.5px;
+}
+
+.strike-fade {
+  transition: opacity 420ms var(--ease-ios) 120ms, color 420ms var(--ease-ios);
+}
+
+/* --- Brief typing caret --------------------------------------------------- */
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: -0.16em;
+  border-radius: 1px;
+  background: var(--c-blue);
+  animation: caret-blink 1s steps(1, end) infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: fade-up 420ms var(--ease-ios) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter,
+  .sheet-enter,
+  .backdrop-enter,
+  .fade-up {
+    animation-duration: 1ms;
+  }
+  .caret {
+    animation: none;
+  }
+  .ios-press,
+  .ios-press-scale,
+  .strike,
+  .strike-fade {
+    transition: none;
+  }
+}

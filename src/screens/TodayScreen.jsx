@@ -25,6 +25,8 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
 
   // Once skipped, stay skipped for the rest of the session.
   const [skipped, setSkipped] = useState(false);
+  const [nowDone, setNowDone] = useState(false);
+  const [lookedAhead, setLookedAhead] = useState(false);
 
   const profile = useMemo(() => getProfile(), [profileRaw]);
   const source = activeSource();
@@ -66,10 +68,18 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
     [profile, openAssignments, allEvents, dining.data, rec.data],
   );
 
-  const weekBrief = useMemo(
+  const weekBriefRaw = useMemo(
     () => composeWeekBrief({ profile, assignments: openAssignments, events: allEvents }),
     [profile, openAssignments, allEvents],
   );
+
+  // Reads as a continuation of the daily brief rather than a new section, once
+  // "Look ahead" reveals it.
+  const weekBrief = useMemo(() => {
+    if (!weekBriefRaw.length) return weekBriefRaw;
+    const [first, ...rest] = weekBriefRaw;
+    return [{ text: 'Looking ahead — ' }, { ...first, text: lowerFirst(first.text) }, ...rest];
+  }, [weekBriefRaw]);
 
   const dateLine = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -95,23 +105,31 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
         </div>
       ) : (
         <>
-          <BriefCard>
+          <div className="fade-up mx-5 mt-4">
             <TypedBrief
               segments={nowBrief}
               onNavigate={onNavigate}
               animate={!skipped}
               onSkip={() => setSkipped(true)}
+              onComplete={() => setNowDone(true)}
             />
-          </BriefCard>
 
-          <BriefCard title="The week ahead" delay={260}>
-            <TypedBrief
-              segments={weekBrief}
-              onNavigate={onNavigate}
-              // The second brief only starts once the first is out of the way.
-              animate={false}
-            />
-          </BriefCard>
+            {nowDone && !lookedAhead && (
+              <button
+                type="button"
+                onClick={() => setLookedAhead(true)}
+                className="ios-press-scale mt-1 rounded-full bg-fill px-3.5 py-[6px] text-[13px] font-medium text-label-2"
+              >
+                Look ahead
+              </button>
+            )}
+
+            {lookedAhead && (
+              <div className="mt-2">
+                <TypedBrief segments={weekBrief} onNavigate={onNavigate} animate />
+              </div>
+            )}
+          </div>
 
           {source === SOURCE.none && (
             <div className="mx-4 mt-3 rounded-[16px] bg-card p-4 text-center">
@@ -135,18 +153,6 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
   );
 }
 
-function BriefCard({ title, children, delay = 0 }) {
-  return (
-    <div
-      className="fade-up mx-4 mt-3 rounded-[20px] bg-card p-5"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      {title && (
-        <h2 className="font-display mb-2 text-[13px] font-semibold tracking-[0.06em] text-label-3 uppercase">
-          {title}
-        </h2>
-      )}
-      {children}
-    </div>
-  );
+function lowerFirst(text) {
+  return text ? text[0].toLowerCase() + text.slice(1) : text;
 }

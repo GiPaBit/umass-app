@@ -432,6 +432,13 @@ button,
   -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
+/* Barely-there depth for text sitting straight on the page background, no card
+   underneath it. Derived from the label colour so it self-adjusts per theme and
+   light/dark, rather than needing separate rules for each. */
+.brief-text {
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--c-label) 16%, transparent);
+}
+
 /* Hairline separators — 0.5px on retina, inset from the left like a UITableView. */
 .ios-separator::after {
   content: '';

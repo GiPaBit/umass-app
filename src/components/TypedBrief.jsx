@@ -17,7 +17,7 @@ const PUNCT_MS = 300; // extra beat after . ! ?
 const COMMA_MS = 110; // shorter beat after , ; —
 const LEAD_IN_MS = 240;
 
-export function TypedBrief({ segments, onNavigate, animate = true, onSkip, className = '' }) {
+export function TypedBrief({ segments, onNavigate, animate = true, onSkip, onComplete, className = '' }) {
   const fullText = useMemo(() => segmentsToText(segments), [segments]);
 
   /** Cumulative time at which each character should appear. */
@@ -75,6 +75,13 @@ export function TypedBrief({ segments, onNavigate, animate = true, onSkip, class
 
   const done = shown >= fullText.length;
 
+  // Fires once whether typing finished naturally or was skipped — either way
+  // the text is now fully on screen.
+  useEffect(() => {
+    if (done) onComplete?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, fullText]);
+
   const skip = () => {
     cancelAnimationFrame(raf.current);
     setShown(fullText.length);
@@ -123,8 +130,8 @@ export function TypedBrief({ segments, onNavigate, animate = true, onSkip, class
   });
 
   return (
-    <div className={className}>
-      <p className="text-[17px] leading-[25px] text-label-2">
+    <div className={`brief-text ${className}`}>
+      <p className="text-[19px] leading-[27px] text-label-2">
         {rendered}
         {!done && <span className="caret" aria-hidden="true" />}
       </p>

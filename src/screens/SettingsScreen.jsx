@@ -7,6 +7,7 @@ import {
   SectionHeader,
   SegmentedControl,
   Sheet,
+  Toggle,
 } from '../components/ui.jsx';
 import { PreferencesFlow } from './PreferencesFlow.jsx';
 import { useLocalState } from '../hooks/useLocalState.js';
@@ -15,6 +16,7 @@ import { FEED_KINDS, deleteFeed, listFeeds, makeFeed, maskUrl, saveFeed } from '
 import { getCanvasAssignments } from '../lib/api.js';
 import { FONTS, MODES, THEMES, getAppearance, setAppearance } from '../lib/theme.js';
 import { getProfile } from '../lib/profile.js';
+import { DEFAULT_BRIEF_PREFS, setBriefPrefs } from '../lib/briefPrefs.js';
 
 /**
  * Settings is a short menu rather than one long scroll: each area opens as its
@@ -26,6 +28,7 @@ export function SettingsScreen({ open, onClose }) {
   const [quickEvents, setQuickEvents] = useLocalState(KEYS.quickEvents, []);
   const [profileRaw] = useLocalState(KEYS.profile, null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [briefPrefs] = useLocalState(KEYS.briefPrefs, DEFAULT_BRIEF_PREFS);
 
   useEffect(() => {
     if (!open) setPage(null);
@@ -46,28 +49,17 @@ export function SettingsScreen({ open, onClose }) {
     <>
       <Sheet open={open} onClose={onClose} title="Settings">
         <div className="pb-10">
-          <SectionHeader>Appearance</SectionHeader>
-          <ListGroup>
+          <ListGroup className="mt-2">
             <Row
               title="Appearance"
               subtitle={`${themeName} · ${MODES.find((m) => m.id === appearance.mode)?.name}`}
               onClick={() => setPage('appearance')}
-              last
             />
-          </ListGroup>
-
-          <SectionHeader>Calendars</SectionHeader>
-          <ListGroup>
             <Row
               title="Calendars"
               subtitle={feedCount ? `${feedCount} connected` : 'Not connected'}
               onClick={() => setPage('calendars')}
-              last
             />
-          </ListGroup>
-
-          <SectionHeader>Preferences</SectionHeader>
-          <ListGroup>
             <Row
               title="Preferences"
               subtitle={
@@ -76,18 +68,44 @@ export function SettingsScreen({ open, onClose }) {
                   : 'Name, food, gym and teams'
               }
               onClick={() => setPage('preferences')}
-              last
             />
-          </ListGroup>
-
-          <SectionHeader>Local Data</SectionHeader>
-          <ListGroup>
             <Row
               title="Local Data"
               subtitle={`${Object.keys(done).length} completed · ${quickEvents.length} quick-added · ${kb} KB`}
               onClick={() => setPage('local-data')}
               last
             />
+          </ListGroup>
+
+          <SectionHeader>Today Brief</SectionHeader>
+          <ListGroup>
+            <Row
+              trailing={
+                <Toggle
+                  checked={briefPrefs.animate}
+                  onChange={(v) => setBriefPrefs({ animate: v })}
+                />
+              }
+            >
+              <div className="text-[17px] text-label">Animate typing</div>
+              <div className="mt-0.5 text-[13px] text-label-2">
+                Off shows the full brief right away, instead of typing it out.
+              </div>
+            </Row>
+            <Row
+              last
+              trailing={
+                <Toggle
+                  checked={briefPrefs.showWeekImmediately}
+                  onChange={(v) => setBriefPrefs({ showWeekImmediately: v })}
+                />
+              }
+            >
+              <div className="text-[17px] text-label">Show week ahead automatically</div>
+              <div className="mt-0.5 text-[13px] text-label-2">
+                Off brings back the "Look ahead" tap instead of showing both at once.
+              </div>
+            </Row>
           </ListGroup>
 
           <p className="px-5 pt-6 text-center text-[12px] leading-[16px] text-label-3">

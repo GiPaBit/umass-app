@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import { Button, RoundButton, Spinner, StaleNotice } from '../components/ui.jsx';
 import { GearIcon } from '../components/Icons.jsx';
@@ -10,6 +10,7 @@ import { KEYS } from '../lib/storage.js';
 import { activeSource, fetchAssignments, SOURCE } from '../lib/assignments.js';
 import { composeNowBrief, composeWeekBrief } from '../lib/brief.js';
 import { getProfile } from '../lib/profile.js';
+import { DEFAULT_BRIEF_PREFS } from '../lib/briefPrefs.js';
 
 /**
  * The landing tab is now just two briefs: what matters right now, and a look at
@@ -22,11 +23,18 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
   const [done] = useLocalState(KEYS.doneAssignments, {});
   const [quickEvents] = useLocalState(KEYS.quickEvents, []);
   const [profileRaw] = useLocalState(KEYS.profile, null);
+  const [briefPrefs] = useLocalState(KEYS.briefPrefs, DEFAULT_BRIEF_PREFS);
 
   // Once skipped, stay skipped for the rest of the session.
   const [skipped, setSkipped] = useState(false);
   const [nowDone, setNowDone] = useState(false);
   const [lookedAhead, setLookedAhead] = useState(false);
+
+  // "Show both right away" skips the tap — the week brief reveals itself the
+  // moment the now-brief finishes, rather than waiting on "Look ahead".
+  useEffect(() => {
+    if (nowDone && briefPrefs.showWeekImmediately) setLookedAhead(true);
+  }, [nowDone, briefPrefs.showWeekImmediately]);
 
   const profile = useMemo(() => getProfile(), [profileRaw]);
   const source = activeSource();
@@ -109,12 +117,12 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
             <TypedBrief
               segments={nowBrief}
               onNavigate={onNavigate}
-              animate={!skipped}
+              animate={briefPrefs.animate && !skipped}
               onSkip={() => setSkipped(true)}
               onComplete={() => setNowDone(true)}
             />
 
-            {nowDone && !lookedAhead && (
+            {nowDone && !lookedAhead && !briefPrefs.showWeekImmediately && (
               <button
                 type="button"
                 onClick={() => setLookedAhead(true)}
@@ -126,7 +134,7 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
 
             {lookedAhead && (
               <div className="mt-2">
-                <TypedBrief segments={weekBrief} onNavigate={onNavigate} animate />
+                <TypedBrief segments={weekBrief} onNavigate={onNavigate} animate={briefPrefs.animate} />
               </div>
             )}
           </div>

@@ -3,10 +3,12 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { applyAppearance } from './lib/theme.js';
+import { initPlatformDetection } from './lib/platform.js';
 import './index.css';
 
 // Apply the saved theme, palette and typeface before first paint so there is no flash.
 applyAppearance();
+initPlatformDetection();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

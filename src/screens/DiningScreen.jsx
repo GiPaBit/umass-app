@@ -20,7 +20,7 @@ import { useAsync } from '../hooks/useAsync.js';
 import { CampusMap } from '../components/CampusMap.jsx';
 import { ALL_VENUES, mapLinks, normalise } from '../lib/diningCatalog.js';
 
-export function DiningScreen({ active = true, onMapModeChange }) {
+export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange }) {
   const { data, error, loading, refresh } = useAsync(getDiningOverview);
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
@@ -29,6 +29,10 @@ export function DiningScreen({ active = true, onMapModeChange }) {
   useEffect(() => {
     onMapModeChange?.(view === 'map');
   }, [view, onMapModeChange]);
+
+  useEffect(() => {
+    onPinSheetChange?.(Boolean(selectedPin));
+  }, [selectedPin, onPinSheetChange]);
 
   // Leaving the Dining tab (or the map sub-view) should never leave a pin
   // selected for next time you come back.

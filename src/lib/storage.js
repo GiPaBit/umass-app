@@ -17,6 +17,7 @@ export const KEYS = {
   profile: `${PREFIX}profile`,
   theme: `${PREFIX}theme`,
   googleToken: `${PREFIX}google-token`,
+  briefPrefs: `${PREFIX}brief-prefs`,
 };
 
 export function read(key, fallback) {
@@ -57,6 +58,7 @@ const CONNECTION_KEYS = [
   // should not make the app ask who you are again.
   KEYS.profile,
   KEYS.theme,
+  KEYS.briefPrefs,
 ];
 
 export function clearAll({ keepAuth = false } = {}) {

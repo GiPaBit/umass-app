@@ -20,7 +20,13 @@ export default function App() {
   // The dining map takes over the whole screen and turns the tab bar into a
   // floating island — only while that tab is both active and on its map view.
   const [diningMapActive, setDiningMapActive] = useState(false);
+  // A selected pin's detail sheet rises from the same bottom edge the floating
+  // tab bar sits at — without this, the island tab bar draws on top of the
+  // sheet's own bottom rows, which is what "blocked by the home bar" reports
+  // to. Hiding it for as long as a pin is open keeps that area clear.
+  const [diningPinOpen, setDiningPinOpen] = useState(false);
   const tabBarFloating = tab === 'dining' && diningMapActive;
+  const tabBarHidden = tabBarFloating && diningPinOpen;
 
   // Badge the Events tab with anything the user pinned for today.
   const badges = useMemo(
@@ -63,7 +69,11 @@ export default function App() {
         <AssignmentsScreen onOpenSettings={openSettings} />
       </TabPane>
       <TabPane active={tab === 'dining'}>
-        <DiningScreen active={tab === 'dining'} onMapModeChange={setDiningMapActive} />
+        <DiningScreen
+          active={tab === 'dining'}
+          onMapModeChange={setDiningMapActive}
+          onPinSheetChange={setDiningPinOpen}
+        />
       </TabPane>
       <TabPane active={tab === 'rec'}>
         <RecScreen />
@@ -72,7 +82,9 @@ export default function App() {
         <EventsScreen />
       </TabPane>
 
-      <TabBar active={tab} onChange={setTab} badges={badges} floating={tabBarFloating} />
+      {!tabBarHidden && (
+        <TabBar active={tab} onChange={setTab} badges={badges} floating={tabBarFloating} />
+      )}
 
       <SettingsScreen open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

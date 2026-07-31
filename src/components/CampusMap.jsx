@@ -25,8 +25,34 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
   const panGesture = useRef(null); // { x, y, startPan } for the one active pointer
   const pinchGesture = useRef(null); // { dist, midX, midY, startZoom, startPan }
   const [gesturing, setGesturing] = useState(false);
+  // The container's own size, tracked live so the map's "fill the screen"
+  // base scale reacts to window resizes and orientation changes — not just
+  // whatever size the container happened to be on first mount.
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
   const { width, height, bounds } = campus;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const update = () => setContainerSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // The scale that makes the map cover the container edge-to-edge with no
+  // gaps, before any user zoom. Applied as a real CSS `scale()` (see the
+  // render below) rather than left to the SVG's own `preserveAspectRatio`
+  // fitting — that fitting permanently discards whatever it crops at render
+  // time, so a plain `translate()` pan has nothing to reveal past the edge
+  // it already threw away. Baking the cover scale into the same transform
+  // as pan/zoom keeps the full map available to slide into view.
+  const baseScale =
+    containerSize.w && containerSize.h
+      ? Math.max(containerSize.w / width, containerSize.h / height)
+      : 1;
 
   const project = (lat, lon) => ({
     x: ((lon - bounds.lonMin) / (bounds.lonMax - bounds.lonMin)) * width,
@@ -34,16 +60,27 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
   });
 
   /**
-   * Keep the map from ever being dragged fully off its container. A fixed
-   * slack is always available (even at min zoom, where the content exactly
-   * covers the container and there'd otherwise be zero room to move at all)
-   * so a drag always does *something*, rather than feeling frozen.
+   * Keep the map from ever being dragged fully off its container, while
+   * guaranteeing every part of the baked map can be panned into view.
+   *
+   * `preserveAspectRatio="slice"` already scales the SVG up by
+   * `max(rect.w/width, rect.h/height)` to cover the container edge-to-edge —
+   * on any container whose aspect ratio doesn't match the map's (e.g. a wide
+   * desktop window against a tall portrait map), that "cover" scale crops
+   * dozens or hundreds of px off the other axis *before* `zoom` ever comes
+   * into it. The old clamp only budgeted slack from `zoom`, so at zoom 1 on
+   * a wide screen there was no way to pan far enough to reach the top/bottom
+   * of the map at all. Deriving slack from the actual rendered content size
+   * (base cover scale × zoom) fixes that on every screen shape.
    */
   const clampPan = (candidate, atZoom) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return candidate;
-    const maxX = Math.max(PAN_SLACK, (rect.width * (atZoom - 1)) / 2);
-    const maxY = Math.max(PAN_SLACK, (rect.height * (atZoom - 1)) / 2);
+    const baseScale = Math.max(rect.width / width, rect.height / height);
+    const contentW = width * baseScale * atZoom;
+    const contentH = height * baseScale * atZoom;
+    const maxX = Math.max(PAN_SLACK, (contentW - rect.width) / 2);
+    const maxY = Math.max(PAN_SLACK, (contentH - rect.height) / 2);
     return {
       x: Math.max(-maxX, Math.min(maxX, candidate.x)),
       y: Math.max(-maxY, Math.min(maxY, candidate.y)),
@@ -171,19 +208,52 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
 
   const zoomBy = (factor) => setZoom((z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z * factor)));
 
+  // Trackpad/mouse-wheel zoom, centred on the cursor — the desktop equivalent
+  // of the pinch gesture above (same keep-the-point-under-the-pointer math).
+  // Attached as a native listener (not React's onWheel) because React wheel
+  // handlers are passive by default, which would silently ignore
+  // preventDefault and let the page behind the map scroll instead of zooming.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
+      const midX = e.clientX - (rect.left + rect.width / 2);
+      const midY = e.clientY - (rect.top + rect.height / 2);
+      const nextPan = {
+        x: midX - (nextZoom * (midX - pan.x)) / zoom,
+        y: midY - (nextZoom * (midY - pan.y)) / zoom,
+      };
+      setZoom(nextZoom);
+      setPan(clampPan(nextPan, nextZoom));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // Re-attached each time zoom/pan change so the handler always closes over
+    // current values rather than the ones from whenever the effect first ran.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, pan]);
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-card">
       <div
         ref={containerRef}
-        className={`relative h-full w-full touch-none ${gesturing ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className={`relative flex h-full w-full items-center justify-center touch-none ${gesturing ? 'cursor-grabbing' : 'cursor-grab'}`}
         onPointerDown={onPointerDown}
       >
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="xMidYMid slice"
-          className="h-full w-full"
+          width={width}
+          height={height}
           style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            display: 'block',
+            flexShrink: 0,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${baseScale * zoom})`,
             transformOrigin: 'center',
             transition: gesturing ? 'none' : 'transform 260ms var(--ease-ios)',
           }}

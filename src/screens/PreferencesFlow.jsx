@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '../components/ui.jsx';
 import { DiningPicker } from '../components/DiningPicker.jsx';
-import { GYM_CHOICES, SPORT_CHOICES, getProfile, setProfile } from '../lib/profile.js';
+import { WorkoutPreferencePicker } from '../components/WorkoutPreferencePicker.jsx';
+import { SPORT_CHOICES, getProfile, setProfile } from '../lib/profile.js';
 
 /**
  * The interests questionnaire. Used twice: full-screen on first launch, and
@@ -14,7 +15,7 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
     return {
       name: p.name || '',
       diningFavourites: p.diningFavourites || [],
-      gymFavourite: p.gymFavourite || '',
+      workoutPreferences: p.workoutPreferences || [],
       sports: p.sports || [],
     };
   });
@@ -55,12 +56,11 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
     },
     {
       title: 'Where do you work out?',
-      caption: 'Your brief will tell you whether it’s open.',
+      caption: 'Pick as many as apply — your brief will tell you whether they’re open.',
       body: (
-        <Chips
-          options={GYM_CHOICES}
-          selected={draft.gymFavourite ? [draft.gymFavourite] : []}
-          onToggle={(v) => set({ gymFavourite: draft.gymFavourite === v ? '' : v })}
+        <WorkoutPreferencePicker
+          selected={draft.workoutPreferences}
+          onChange={(workoutPreferences) => set({ workoutPreferences })}
         />
       ),
     },

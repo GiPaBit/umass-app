@@ -119,6 +119,24 @@ export function relativeLabel(date) {
   return diff >= 0 ? `in ${value}` : `${value} ago`;
 }
 
+/** "Jul 27" from a date key — a compact date to pair with a weekday name. */
+export function shortDateLabel(key) {
+  if (!key) return '';
+  return keyToDate(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** "Closes today" / "Closes tomorrow" / "Closes in 7 days" — for a deadline date. */
+export function relativeDayLabel(date, { verb = 'Closes' } = {}) {
+  if (!date) return '';
+  const key = dateKey(date);
+  const today = todayKey();
+  if (key < today) return 'Closed';
+  if (key === today) return `${verb} today`;
+  if (key === shiftKey(today, 1)) return `${verb} tomorrow`;
+  const days = Math.round((keyToDate(key) - keyToDate(today)) / 86400000);
+  return `${verb} in ${days} day${days === 1 ? '' : 's'}`;
+}
+
 /** Group items into [{ key, label, items }] buckets by Amherst calendar day. */
 export function groupByDay(items, getDate) {
   const buckets = new Map();

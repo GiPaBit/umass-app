@@ -16,6 +16,8 @@ export const KEYS = {
   // Name and interests gathered during onboarding; drives the Today brief.
   profile: `${PREFIX}profile`,
   theme: `${PREFIX}theme`,
+  // Which top-level mode (RecWell / Sports) the Rec & Sports screen last showed.
+  recSection: `${PREFIX}rec-section`,
   googleToken: `${PREFIX}google-token`,
   briefPrefs: `${PREFIX}brief-prefs`,
 };

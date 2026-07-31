@@ -1,5 +1,5 @@
 import { dateKey, isToday, timeLabel, todayKey, shiftKey, dayLabelFromKey } from './dates.js';
-import { matchesName, matchesSports } from './profile.js';
+import { matchesName, matchesSports, workoutFacilityMatch } from './profile.js';
 
 /**
  * Builds the two Today-tab briefs as arrays of segments:
@@ -157,14 +157,23 @@ function composeDining(dining, profile) {
 }
 
 function composeGym(rec, profile) {
-  const facilities = rec?.facilities || [];
+  const facilities = rec?.recwell?.hours?.facilities || [];
   if (!facilities.length) return null;
 
-  const favourite = profile?.gymFavourite;
+  // Not every workout preference maps to an hours-tracked facility (NEST has no
+  // published hours; Group Fitness is a program, not a place) — those tokens
+  // resolve to null and drop out, which is fine, they just don't drive this line.
+  const candidates = (profile?.workoutPreferences || [])
+    .map((token) => {
+      const match = workoutFacilityMatch(token);
+      return match ? facilities.find((f) => matchesName(f.name, [match])) : null;
+    })
+    .filter(Boolean);
+
   const target =
-    (favourite && favourite !== 'No preference'
-      ? facilities.find((f) => matchesName(f.name, [favourite]))
-      : null) || facilities.find((f) => /recreation center/i.test(f.name));
+    candidates.find((f) => f.status?.state === 'open') ||
+    candidates[0] ||
+    facilities.find((f) => /recreation center/i.test(f.name));
 
   if (!target) return null;
 

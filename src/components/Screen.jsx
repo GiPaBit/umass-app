@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Spinner } from './ui.jsx';
+import { TitleMenu } from './TitleMenu.jsx';
 
 const PULL_TRIGGER = 68; // px of pull needed to fire a refresh
 const PULL_MAX = 110; // hard stop so the content never flies off screen
@@ -16,31 +17,48 @@ const SHRINK_OVER = 56; // px of scroll across which the title collapses
  *
  * Safe-area inset is applied to the non-scrolling wrapper, so `sticky top-0`
  * parks the title below the notch instead of under it.
+ *
+ * `titleMenu={{ options, value, onChange }}` renders the title as a tappable
+ * dropdown instead of plain text (used by the Rec & Sports screen to switch
+ * between RecWell and Sports). A parent can also grab `scrollToTop()` off a ref
+ * to this component — there's no way to detect an iOS PWA's status-bar tap from
+ * the DOM, so callers build their own floating "scroll to top" affordance and
+ * drive it through this instead.
  */
-export function Screen({ title, children, onRefresh, trailing, subtitle }) {
+export const Screen = forwardRef(function Screen(
+  { title, titleMenu, children, onRefresh, trailing, subtitle, onScroll },
+  ref,
+) {
   const scrollRef = useRef(null);
   const [progress, setProgress] = useState(0); // 0 = full size, 1 = fully shrunk
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [dragging, setDragging] = useState(false);
 
+  useImperativeHandle(ref, () => ({
+    scrollToTop: () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }),
+    getScrollTop: () => scrollRef.current?.scrollTop ?? 0,
+  }));
+
   // --- title shrink -------------------------------------------------------
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     let frame = 0;
-    const onScroll = () => {
+    const handleScroll = () => {
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
         setProgress(Math.min(1, Math.max(0, el.scrollTop / SHRINK_OVER)));
+        onScroll?.(el.scrollTop);
       });
     };
-    el.addEventListener('scroll', onScroll, { passive: true });
+    el.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
-      el.removeEventListener('scroll', onScroll);
+      el.removeEventListener('scroll', handleScroll);
       if (frame) cancelAnimationFrame(frame);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- pull to refresh ----------------------------------------------------
@@ -181,12 +199,22 @@ export function Screen({ title, children, onRefresh, trailing, subtitle }) {
             transition: 'background 200ms linear',
           }}
         >
-          <h1
-            className="font-display truncate font-bold text-label"
-            style={{ fontSize: `${titleSize}px`, lineHeight: 1.2 }}
-          >
-            {title}
-          </h1>
+          {titleMenu ? (
+            <TitleMenu
+              options={titleMenu.options}
+              value={titleMenu.value}
+              onChange={titleMenu.onChange}
+              fontSize={titleSize}
+              lineHeight={1.2}
+            />
+          ) : (
+            <h1
+              className="font-display truncate font-bold text-label"
+              style={{ fontSize: `${titleSize}px`, lineHeight: 1.2 }}
+            >
+              {title}
+            </h1>
+          )}
           {subtitle && (
             <p
               className="truncate text-[15px] text-label-2"
@@ -205,4 +233,4 @@ export function Screen({ title, children, onRefresh, trailing, subtitle }) {
       </div>
     </div>
   );
-}
+});

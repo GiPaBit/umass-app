@@ -35,9 +35,25 @@ export function textOf(html = '') {
  */
 export function firstSentences(text, n = 2) {
   if (!text) return text;
-  const sentences = text.match(/[^.!?]+[.!?]+(?:['")\]]+)?(?=\s|$)/g);
-  if (!sentences || sentences.length <= n) return text.trim();
-  return sentences.slice(0, n).join(' ').trim();
+  const trimmed = text.trim();
+  // Multi-initial abbreviations ("W.E.B.", "U.S.") have internal periods that
+  // aren't sentence boundaries. Every period before the abbreviation's last one
+  // fails the whitespace lookahead below and is silently dropped rather than
+  // carried into any match, so without this guard "W.E.B. Du Bois Library..."
+  // becomes "B. Du Bois Library..." — only the trailing fragment survives.
+  // Swap those internal periods for a placeholder so the splitter skips past
+  // the whole abbreviation, then restore them.
+  const PLACEHOLDER = '​';
+  const protectedText = trimmed.replace(/\b(?:[A-Z]\.){2,}/g, (m) => m.replace(/\./g, PLACEHOLDER));
+  const sentences = protectedText.match(/[^.!?]+[.!?]+(?:['")\]]+)?(?=\s|$)/g);
+  if (!sentences || sentences.length <= n) return trimmed;
+  return sentences
+    .slice(0, n)
+    .map((s) => s.trim())
+    .join(' ')
+    .split(PLACEHOLDER)
+    .join('.')
+    .trim();
 }
 
 /** Read one attribute out of a single tag's source, tolerating single or double quotes. */

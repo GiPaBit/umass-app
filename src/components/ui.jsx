@@ -222,12 +222,29 @@ const DETENT_COMMIT_FRACTION = 0.25; // dragged past this fraction of the gap to
 const FLICK_VELOCITY_PX_S = 550; // a release faster than this overrides the position threshold
 const BACKDROP_MAX_OPACITY = 0.4;
 const CONTENT_MARGIN_PX = 24; // handle + content + this ≈ a "content" detent's natural height
-const VIEWPORT_MARGIN_PX = 8; // gap left at the very top of the "viewport" detent
+const VIEWPORT_TOP_GAP_PX = 10; // sliver of background left below the safe area, matching native iOS full presentation
 
 const DEFAULT_DETENTS = [{ key: 'resting', height: 'content' }];
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * `env(safe-area-inset-top)` can't be read directly from JS — measure it via a
+ * zero-size probe whose only height comes from that padding. Used so the
+ * `'viewport'` detent caps at the safe area instead of the physical top of the
+ * screen, where it would slide under the notch/Dynamic Island.
+ */
+function measureSafeAreaInsetTop() {
+  if (typeof document === 'undefined') return 0;
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    'position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);pointer-events:none;visibility:hidden;';
+  document.body.appendChild(probe);
+  const inset = probe.offsetHeight;
+  document.body.removeChild(probe);
+  return inset;
 }
 
 /** Resolve one detent's configured height into a concrete px number for this measurement pass. */
@@ -382,7 +399,7 @@ export const Sheet = forwardRef(function Sheet(
     if (!mounted) return;
     const measure = () => {
       if (hasViewportDetent) {
-        setContainerPx(window.innerHeight - VIEWPORT_MARGIN_PX);
+        setContainerPx(window.innerHeight - measureSafeAreaInsetTop() - VIEWPORT_TOP_GAP_PX);
       } else {
         setContainerPx(contentPx == null ? null : Math.min(contentPx, window.innerHeight * 0.92));
       }

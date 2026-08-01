@@ -18,7 +18,14 @@ import { ChevronIcon } from '../components/Icons.jsx';
 import { getDiningOverview, getHallMenu } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { CampusMap } from '../components/CampusMap.jsx';
-import { ALL_VENUES, mapLinks, normalise } from '../lib/diningCatalog.js';
+import {
+  ALL_VENUES,
+  FOOD_TRUCK_NOTE,
+  hasNoFixedLocation,
+  mapLinks,
+  normalise,
+  venuesInGroup,
+} from '../lib/diningCatalog.js';
 
 export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange }) {
   const { data, error, loading, refresh } = useAsync(getDiningOverview);
@@ -71,14 +78,6 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
     return (hit.type === 'hall' ? hit.hall.status : hit.venue.status)?.state || 'unknown';
   };
 
-  const hoursOf = (name) => {
-    const hit = lookupLive(name);
-    if (!hit) return null;
-    return hit.type === 'hall'
-      ? hit.hall.status?.hoursText || null
-      : hit.venue.hoursText || hit.venue.status?.hoursText || null;
-  };
-
   /** Build a detail-sheet target for a catalogue venue name, falling back to a bare name if nothing live matched. */
   const resolveTarget = (name) => lookupLive(name) || { type: 'retail', venue: { name } };
 
@@ -126,7 +125,6 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
         <MapPinSheet
           pin={selectedPin}
           statusOf={statusOf}
-          hoursOf={hoursOf}
           resolveTarget={resolveTarget}
           onClose={() => setSelectedPin(null)}
         />
@@ -198,6 +196,20 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
             </div>
           ))}
 
+          <SectionHeader>Food Trucks</SectionHeader>
+          <ListGroup>
+            {venuesInGroup('foodtrucks').map((name, i, arr) => (
+              <Row
+                key={name}
+                last={i === arr.length - 1}
+                onClick={() => setDetailTarget({ type: 'retail', venue: { name } })}
+              >
+                <div className="text-[17px] leading-[22px] text-label">{name}</div>
+                <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">{FOOD_TRUCK_NOTE}</div>
+              </Row>
+            ))}
+          </ListGroup>
+
           <p className="px-5 pt-5 pb-2 text-[12px] leading-[16px] text-label-3">
             Live from umassdining.com. Menus are published for the current day only.
           </p>
@@ -228,7 +240,7 @@ const MAP_PIN_DETENTS = [
   { key: 'peek', height: MAP_PIN_PEEK_PX },
 ];
 
-function MapPinSheet({ pin, statusOf, hoursOf, resolveTarget, onClose }) {
+function MapPinSheet({ pin, statusOf, resolveTarget, onClose }) {
   const [expandedName, setExpandedName] = useState(null);
 
   useEffect(() => {
@@ -263,9 +275,6 @@ function MapPinSheet({ pin, statusOf, hoursOf, resolveTarget, onClose }) {
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-[17px] leading-[22px] text-label">{venue.name}</div>
-                  <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                    {hoursOf(venue.name) || venue.groupName}
-                  </div>
                 </div>
                 <StatusPill state={statusOf(venue.name)} />
                 <ChevronIcon
@@ -277,7 +286,7 @@ function MapPinSheet({ pin, statusOf, hoursOf, resolveTarget, onClose }) {
                 className="grid transition-[grid-template-rows] duration-300"
                 style={{ gridTemplateRows: isOpen ? '1fr' : '0fr', transitionTimingFunction: 'var(--ease-ios)' }}
               >
-                <div className="overflow-hidden">{isOpen && <VenueDetail target={resolveTarget(venue.name)} />}</div>
+                <div className="overflow-hidden">{isOpen && <VenueMapSummary target={resolveTarget(venue.name)} />}</div>
               </div>
             </div>
           );
@@ -322,7 +331,8 @@ function VenueDetail({ target }) {
   const activeMeal = meal && meals.some((m) => m.meal === meal) ? meal : defaultMeal(meals);
   const current = meals.find((m) => m.meal === activeMeal);
 
-  const links = name ? mapLinks({ name }) : null;
+  const noLocation = hasNoFixedLocation(name);
+  const links = name && !noLocation ? mapLinks({ name }) : null;
 
   return (
     <>
@@ -331,18 +341,20 @@ function VenueDetail({ target }) {
 
       {!isHall && (
         <div className="px-4 pt-3">
-          {venue?.status && (
+          {noLocation ? (
+            <p className="text-[14px] leading-[19px] text-label-2">{FOOD_TRUCK_NOTE}</p>
+          ) : venue?.status ? (
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill state={venue.status.state} />
               {(venue.hoursText || venue.status.hoursText) && (
                 <span className="text-[14px] text-label-2">{venue.hoursText || venue.status.hoursText}</span>
               )}
             </div>
-          )}
-          {venue?.description && (
+          ) : null}
+          {!noLocation && venue?.description && (
             <p className="mt-3 text-[15px] leading-[21px] text-label">{venue.description}</p>
           )}
-          {!venue?.status && !venue?.description && (
+          {!noLocation && !venue?.status && !venue?.description && (
             <p className="text-[14px] leading-[19px] text-label-2">
               No live details for this spot right now.
             </p>
@@ -466,6 +478,66 @@ function VenueDetail({ target }) {
               </ListGroup>
             </div>
           ))}
+        </>
+      )}
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Minimal glance-and-go card for the map pin sheet: name (already the row's   */
+/* own title), status, today's hours, and the location link. No menu, no      */
+/* description, no weekly hours table — that's what the List view's full      */
+/* VenueDetail sheet is for.                                                   */
+/* -------------------------------------------------------------------------- */
+
+function VenueMapSummary({ target }) {
+  const isHall = target?.type === 'hall';
+  const hall = isHall ? target.hall : null;
+  const venue = !isHall ? target?.venue : null;
+  const name = isHall ? hall?.name : venue?.name;
+
+  const noLocation = hasNoFixedLocation(name);
+  const state = isHall ? hall?.status?.state : venue?.status?.state;
+  const hoursText = isHall ? hall?.status?.hoursText : venue?.hoursText || venue?.status?.hoursText;
+  const links = name && !noLocation ? mapLinks({ name }) : null;
+
+  return (
+    <>
+      <div className="px-4 pt-3 pb-2">
+        {noLocation ? (
+          <p className="text-[14px] leading-[19px] text-label-2">{FOOD_TRUCK_NOTE}</p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill state={state || 'unknown'} />
+            <span className="text-[14px] text-label-2">
+              {state === 'closed' ? 'Closed today' : hoursText || 'Hours unavailable'}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {links && (
+        <>
+          <SectionHeader>Location</SectionHeader>
+          <div className="flex gap-2 px-4 pb-2">
+            <a
+              href={links.apple}
+              target="_blank"
+              rel="noreferrer"
+              className="ios-press-scale flex-1 rounded-[12px] bg-fill px-3 py-[10px] text-center text-[14px] font-medium text-ios-blue"
+            >
+              Open in Apple Maps
+            </a>
+            <a
+              href={links.google}
+              target="_blank"
+              rel="noreferrer"
+              className="ios-press-scale flex-1 rounded-[12px] bg-fill px-3 py-[10px] text-center text-[14px] font-medium text-ios-blue"
+            >
+              Open in Google Maps
+            </a>
+          </div>
         </>
       )}
     </>

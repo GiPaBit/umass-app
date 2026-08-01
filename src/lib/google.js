@@ -202,7 +202,10 @@ function stripHtml(html) {
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .trim();
-  return text.length > 400 ? `${text.slice(0, 400)}…` : text;
+  if (text.length <= 400) return text;
+  const cut = text.slice(0, 400);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim()}…`;
 }
 
 function extractLink(html) {

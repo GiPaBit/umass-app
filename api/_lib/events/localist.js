@@ -69,5 +69,8 @@ function normalize(e) {
 function cleanText(str) {
   if (!str) return null;
   const trimmed = firstSentences(str.replace(/\s+/g, ' ').trim());
-  return trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
+  if (trimmed.length <= 400) return trimmed;
+  const cut = trimmed.slice(0, 400);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim()}…`;
 }

@@ -90,7 +90,22 @@ export const DINING_GROUPS = [
       { name: "Hampshire Grab 'n Go", lat: 42.383856, lon: -72.530517 },
     ],
   },
+  {
+    id: 'foodtrucks',
+    name: 'Food Trucks',
+    hint: 'No fixed spot — check on the day',
+    selectAllOnGroup: false,
+    // No coordinates (they move) and no location/hours data exists for either —
+    // `noLocation` suppresses the Location section, map links and map pin.
+    venues: [
+      { name: 'BabyBerk', lat: null, lon: null, noLocation: true },
+      { name: 'BabyBerk2', lat: null, lon: null, noLocation: true },
+    ],
+  },
 ];
+
+/** Shown in place of hours/location for venues with no fixed spot (food trucks). */
+export const FOOD_TRUCK_NOTE = 'Location and hours vary.';
 
 /** Flat list of every venue, tagged with its group. */
 export const ALL_VENUES = DINING_GROUPS.flatMap((g) =>
@@ -110,6 +125,11 @@ export function findVenue(name) {
     ALL_VENUES.find((v) => normalise(v.name).includes(target) || target.includes(normalise(v.name))) ||
     null
   );
+}
+
+/** Food trucks and anything else with no fixed spot — no Location section, map link, or pin. */
+export function hasNoFixedLocation(name) {
+  return findVenue(name)?.noLocation === true;
 }
 
 /**

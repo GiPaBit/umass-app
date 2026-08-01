@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { firstSentences } from '../html.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
 /**
@@ -41,7 +42,7 @@ export async function getIntramurals() {
 
   return {
     intramural: {
-      overview: firstSection ? truncate(firstSection.lines.join(' '), 220) : null,
+      overview: firstSection ? firstSentences(firstSection.lines.join(' ')) : null,
       sports,
       sections,
       registrationUrl: `${REC_BASE}${REC_PAGES.intramurals}`,
@@ -60,7 +61,3 @@ function parseMDY(text) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-function truncate(text, max) {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max).trim()}…`;
-}

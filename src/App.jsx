@@ -7,16 +7,26 @@ import { RecScreen } from './screens/RecScreen.jsx';
 import { EventsScreen } from './screens/EventsScreen.jsx';
 import { SettingsScreen } from './screens/SettingsScreen.jsx';
 import { OnboardingScreen } from './screens/OnboardingScreen.jsx';
+import { InstallScreen } from './screens/InstallScreen.jsx';
 import { useLocalState } from './hooks/useLocalState.js';
 import { KEYS } from './lib/storage.js';
 import { isToday } from './lib/dates.js';
 import { isOnboarded } from './lib/profile.js';
+import { isStandalone } from './lib/platform.js';
+
+// Flip to true once ready to make the install page a hard gate on every
+// browser visit. Left off for now so "continue in browser" (dismiss-and-
+// remember, below) is what actually runs — otherwise every local dev visit
+// via `docker compose up` would hit this page on every reload.
+const ALWAYS_SHOW_INSTALL_PAGE = false;
 
 export default function App() {
   const [tab, setTab] = useState('today');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quickEvents] = useLocalState(KEYS.quickEvents, []);
   const [needsOnboarding, setNeedsOnboarding] = useState(() => !isOnboarded());
+  const [standalone] = useState(isStandalone);
+  const [installDismissed, setInstallDismissed] = useLocalState(KEYS.installDismissed, false);
   // The dining map takes over the whole screen and turns the tab bar into a
   // floating island — only while that tab is both active and on its map view.
   const [diningMapActive, setDiningMapActive] = useState(false);
@@ -51,7 +61,15 @@ export default function App() {
 
   const openSettings = () => setSettingsOpen(true);
 
-  // First launch: learn the basics before showing a brief that would be empty.
+  // Opened as a regular browser tab, not installed: this is the entry point
+  // in browser mode, not an interstitial — the primary call to action is
+  // installing, but browsing on is always one tap away.
+  if (!standalone && (ALWAYS_SHOW_INSTALL_PAGE || !installDismissed)) {
+    return <InstallScreen onContinue={() => setInstallDismissed(true)} />;
+  }
+
+  // First launch in standalone mode: learn the basics before showing a brief
+  // that would be empty.
   if (needsOnboarding) {
     return <OnboardingScreen onDone={() => setNeedsOnboarding(false)} />;
   }

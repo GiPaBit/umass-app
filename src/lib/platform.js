@@ -33,3 +33,56 @@ export function initPlatformDetection() {
   window.addEventListener('pageshow', apply);
   window.addEventListener('orientationchange', apply);
 }
+
+/** iOS has no `beforeinstallprompt`; Safari's Share-sheet "Add to Home Screen" is manual only. */
+export function isIOS() {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    // iPadOS reports as "MacIntel" but, unlike a real Mac, has a touchscreen.
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
+ * Chrome/Edge on Android (and desktop) fire `beforeinstallprompt` once the
+ * install criteria are met, then expect the page to have stashed the event
+ * and to call `.prompt()` on it later from a user gesture — the browser
+ * won't hand it out again after the page swallows it once.
+ */
+let deferredInstallPrompt = null;
+const installPromptListeners = new Set();
+
+export function initInstallPromptCapture() {
+  if (typeof window === 'undefined') return;
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installPromptListeners.forEach((fn) => fn());
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    installPromptListeners.forEach((fn) => fn());
+  });
+}
+
+export function getInstallPrompt() {
+  return deferredInstallPrompt;
+}
+
+/** Subscribe to changes in install-prompt availability; returns an unsubscribe fn. */
+export function onInstallPromptChange(fn) {
+  installPromptListeners.add(fn);
+  return () => installPromptListeners.delete(fn);
+}
+
+export async function promptInstall() {
+  if (!deferredInstallPrompt) return null;
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installPromptListeners.forEach((fn) => fn());
+  return choice;
+}

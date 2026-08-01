@@ -567,12 +567,29 @@ button,
   animation: fade-up 420ms var(--ease-ios) both;
 }
 
+/* --- Welcome screen feature ticker: seamless infinite marquee ------------- */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  animation: ticker-scroll 26s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .screen-enter,
   .fade-up {
     animation-duration: 1ms;
   }
   .caret {
+    animation: none;
+  }
+  .ticker-track {
     animation: none;
   }
   .ios-press,

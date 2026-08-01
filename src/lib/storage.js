@@ -20,6 +20,8 @@ export const KEYS = {
   recSection: `${PREFIX}rec-section`,
   googleToken: `${PREFIX}google-token`,
   briefPrefs: `${PREFIX}brief-prefs`,
+  // "Continue in browser" on the install page — see ALWAYS_SHOW_INSTALL_PAGE in App.jsx.
+  installDismissed: `${PREFIX}install-dismissed`,
 };
 
 export function read(key, fallback) {

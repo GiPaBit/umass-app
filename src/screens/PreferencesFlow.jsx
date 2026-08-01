@@ -75,7 +75,11 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
   const last = step === steps.length - 1;
 
   const finish = () => {
-    setProfile({ ...draft, name: draft.name.trim(), onboarded: true });
+    // Not `onboarded: true` here — during first launch that flag is only set
+    // once the onboarding shell reaches (or skips) calendar setup, so a
+    // force-quit mid-flow doesn't drop someone into the app having skipped
+    // the calendar pitch. Reused from Settings, `onboarded` is already true.
+    setProfile({ ...draft, name: draft.name.trim() });
     onDone();
   };
 

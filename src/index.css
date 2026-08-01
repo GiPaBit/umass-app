@@ -362,6 +362,7 @@
   --radius-ios: 10px;
   --radius-card: 16px;
   --radius-card-lg: 20px;
+  --radius-sheet: 18px;
 
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -499,32 +500,6 @@ button,
   animation: screen-in 320ms var(--ease-ios) both;
 }
 
-@keyframes sheet-in {
-  from {
-    transform: translate3d(0, 100%, 0);
-  }
-  to {
-    transform: none;
-  }
-}
-
-@keyframes backdrop-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.sheet-enter {
-  animation: sheet-in 420ms var(--ease-ios) both;
-}
-
-.backdrop-enter {
-  animation: backdrop-in 300ms ease both;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -594,8 +569,6 @@ button,
 
 @media (prefers-reduced-motion: reduce) {
   .screen-enter,
-  .sheet-enter,
-  .backdrop-enter,
   .fade-up {
     animation-duration: 1ms;
   }

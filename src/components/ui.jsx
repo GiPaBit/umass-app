@@ -1,6 +1,7 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckIcon, ChevronIcon, CloseIcon, ExternalIcon, RefreshIcon } from './Icons.jsx';
+import { createSpring } from '../lib/spring.js';
 
 /* -------------------------------------------------------------------------- */
 /* Lists — the iOS "inset grouped" table style                                  */
@@ -217,86 +218,278 @@ export function Button({ children, variant = 'filled', onClick, type = 'button',
 /* Sheet                                                                        */
 /* -------------------------------------------------------------------------- */
 
-const SHEET_DISMISS_PX = 90; // dragged down this far (or a fast flick) counts as "let go"
-const SHEET_EXPAND_PX = 36; // dragged up this far snaps straight to the full detent
-const SHEET_FLICK_VELOCITY = 0.55; // px/ms — a fast flick overrides the distance thresholds
+const DETENT_COMMIT_FRACTION = 0.25; // dragged past this fraction of the gap to a neighboring detent commits to it
+const FLICK_VELOCITY_PX_S = 550; // a release faster than this overrides the position threshold
+const BACKDROP_MAX_OPACITY = 0.4;
+const CONTENT_MARGIN_PX = 24; // handle + content + this ≈ a "content" detent's natural height
+const VIEWPORT_MARGIN_PX = 8; // gap left at the very top of the "viewport" detent
+
+const DEFAULT_DETENTS = [{ key: 'resting', height: 'content' }];
+
+function prefersReducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** Resolve one detent's configured height into a concrete px number for this measurement pass. */
+function resolveHeightPx(entry, { containerPx, contentPx }) {
+  if (entry.height === 'viewport') return containerPx;
+  if (entry.height === 'content') return contentPx == null ? null : Math.min(contentPx, containerPx);
+  return Math.min(entry.height, containerPx);
+}
 
 /**
- * Bottom sheet with a real drag handle, two detents (partial/full), swipe-down
- * to dismiss and swipe-up to expand. Used for every modal/popup surface in the
- * app so gesture behavior only has to be right in one place.
+ * Turn a `detents` config (tallest → shortest) into concrete pixel heights and
+ * the translateY each one sits at relative to the tallest (0 = tallest, larger
+ * = shorter/lower). `null` while anything it depends on hasn't measured yet.
+ */
+function resolveDetents(detents, { containerPx, contentPx }) {
+  if (containerPx == null) return null;
+  const resolved = [];
+  for (const entry of detents) {
+    const px = resolveHeightPx(entry, { containerPx, contentPx });
+    if (px == null) return null;
+    resolved.push({ key: entry.key, px, translateY: containerPx - px });
+  }
+  return resolved;
+}
+
+/**
+ * Given a live drag/settle position `y` and the detent index it started from,
+ * decide which neighboring detent (by index into `resolvedDetents`, or
+ * `resolvedDetents.length` to mean "dismiss") a release commits to — by
+ * position (past ~25% of the gap) or velocity (a fast enough flick), in
+ * whichever direction the gesture was headed. Otherwise springs back.
+ */
+function resolveRelease({ resolvedDetents, dismissY, fromIndex, y, velocityPxS }) {
+  const positions = [...resolvedDetents.map((d) => d.translateY), dismissY];
+  const current = positions[fromIndex];
+  const downY = positions[fromIndex + 1] ?? null;
+  const upY = fromIndex > 0 ? positions[fromIndex - 1] : null;
+
+  if (y > current && downY != null) {
+    const gap = downY - current;
+    const frac = gap > 0 ? (y - current) / gap : 1;
+    if (frac > DETENT_COMMIT_FRACTION || velocityPxS > FLICK_VELOCITY_PX_S) return fromIndex + 1;
+  } else if (y < current && upY != null) {
+    const gap = current - upY;
+    const frac = gap > 0 ? (current - y) / gap : 1;
+    if (frac > DETENT_COMMIT_FRACTION || -velocityPxS > FLICK_VELOCITY_PX_S) return fromIndex - 1;
+  }
+  return fromIndex;
+}
+
+/**
+ * Bottom sheet with a real drag handle, spring-driven motion and a
+ * configurable, ordered list of detents (tallest → shortest). Used for every
+ * modal/popup surface in the app so gesture/motion behavior only has to be
+ * right in one place — one shared spring (`src/lib/spring.js`), per-sheet
+ * detent config.
+ *
+ * `detents`: `[{ key, height }]`, tallest first. `height` is either `'content'`
+ * (measured from children, at most once per open — see below), `'viewport'`
+ * (near-full-screen), or a literal px number (e.g. a `peek` detent — "roughly
+ * a header's height" doesn't need to be measured, just eyeballed). Defaults to
+ * a single `resting` content detent: the common "modal task" case (Settings,
+ * Add a calendar, Quick Add, detail sheets) where there's no peek and the
+ * height is frozen for the sheet's whole open session — that's the fix for
+ * the add-a-calendar bug, where switching Google/Canvas/Other tabs used to
+ * re-measure and re-snap the sheet live.
+ *
+ * `contentKey`: only matters for multi-detent sheets (the dining map pin is
+ * the one user of this) — pass something that changes when the sheet's
+ * subject changes (e.g. the pin's id) so the `content` detent re-measures for
+ * genuinely new content, without re-measuring on every incidental internal
+ * resize the way the old `ResizeObserver`-driven version did.
  *
  * Drag detection lives on raw DOM listeners (not JSX touch props) because React
  * attaches JSX touch handlers as passive — `preventDefault()` there is silently
  * ignored, same reason `Screen.jsx`'s pull-to-refresh does the same thing.
  *
- * `ref` exposes `expand()` / `collapse()` / `close()` so a parent can drive the
- * sheet programmatically (e.g. auto-expanding when an accordion row opens).
+ * `ref` exposes `expand()` / `collapse()` / `close()` so a parent can still
+ * drive the sheet programmatically if it needs to.
  */
 export const Sheet = forwardRef(function Sheet(
-  { open, onClose, title, children, action, initialDetent = 'partial' },
+  { open, onClose, title, children, action, detents = DEFAULT_DETENTS, initialDetent, contentKey },
   ref,
 ) {
   const handleRef = useRef(null);
   const contentRef = useRef(null);
   const contentInnerRef = useRef(null);
-  const detentRef = useRef(initialDetent);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  const [detent, setDetentState] = useState(initialDetent);
-  const [partialPx, setPartialPx] = useState(null);
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [closing, setClosing] = useState(false);
+  const reducedMotion = useRef(prefersReducedMotion());
+  const spring = useRef(null);
+  if (!spring.current) spring.current = createSpring(0);
 
-  const setDetent = (next) => {
-    detentRef.current = next;
-    setDetentState(next);
-  };
+  const [mounted, setMounted] = useState(open);
+  const [closing, setClosing] = useState(false);
+  const [containerPx, setContainerPx] = useState(null);
+  const [contentPx, setContentPx] = useState(null);
+  const [motion, setMotion] = useState({ y: 0, opacity: 0 });
+  const enteredRef = useRef(false);
+  const detentIndexRef = useRef(0);
+
+  const hasViewportDetent = detents[0]?.height === 'viewport';
 
   useImperativeHandle(ref, () => ({
-    expand: () => setDetent('full'),
-    collapse: () => setDetent('partial'),
+    expand: () => goToDetent(0),
+    collapse: () => goToDetent(detents.length - 1),
     close: () => onCloseRef.current?.(),
   }));
 
-  // Reset to a clean state every time the sheet (re)opens.
-  useEffect(() => {
-    if (!open) return;
-    setDetent(initialDetent);
-    setClosing(false);
-    setDragY(0);
-    setDragging(false);
+  // Reset for a fresh open; on close, keep the node mounted until the exit
+  // animation (driven below) actually finishes, instead of unmounting the
+  // instant the parent flips `open` false — that instant unmount was why
+  // dismiss (X button, backdrop tap) never animated. Layout effect so a
+  // reopen's stale `contentPx` is cleared before the measurement effects
+  // below read it, instead of flashing the previous session's size first.
+  useLayoutEffect(() => {
+    if (open) {
+      setMounted(true);
+      setClosing(false);
+      enteredRef.current = false;
+      setContentPx(null);
+      reducedMotion.current = prefersReducedMotion();
+    } else if (mounted && !closing) {
+      beginClose(0);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Measure the partial detent from actual content, capped at 92vh — the same
-  // ceiling the old fixed-height sheet used — so short content still looks
-  // content-sized instead of always opening at a fixed fraction of the screen.
+  // Measure the "content" detent once per open (or when `contentKey` changes
+  // for a genuinely new subject) — never on incidental internal resizes.
   //
-  // Observing `contentInnerRef` (the unconstrained wrapper around `children`)
-  // rather than the scrollable `contentRef` itself matters: `contentRef`'s own
-  // box is pinned by the flex layout once a height is set, so it never resizes
-  // even when the content inside it shrinks or grows — ResizeObserver watches
-  // an element's rendered box, not its `scrollHeight`.
-  useEffect(() => {
-    if (!open) return;
+  // Depends on `mounted`, not just `open`: the reset effect above flips
+  // `mounted` true via its own `setState`, which — because `if (!mounted)
+  // return null` gates the JSX — means the *first* render after `open`
+  // becomes true still renders nothing (mounted hasn't caught up yet) and
+  // `handleRef`/`contentInnerRef` are still null. Keying only on `open`
+  // measured on that render and froze in a bogus ~0px reading forever, since
+  // nothing was left to trigger a second measurement. `mounted` itself only
+  // flips on the *next* render, once the real DOM has actually committed.
+  useLayoutEffect(() => {
+    if (!mounted) return;
+    const h = handleRef.current?.offsetHeight || 0;
+    const c = contentInnerRef.current?.offsetHeight || 0;
+    setContentPx(h + c + CONTENT_MARGIN_PX);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, contentKey]);
+
+  // The "viewport" detent (dining map pin's `full`) is screen-driven, not
+  // content-driven — legitimate to recompute on resize/orientation change.
+  useLayoutEffect(() => {
+    if (!mounted) return;
     const measure = () => {
-      const h = handleRef.current?.offsetHeight || 0;
-      const c = contentInnerRef.current?.offsetHeight || 0;
-      setPartialPx(Math.min(h + c + 24, window.innerHeight * 0.92));
+      if (hasViewportDetent) {
+        setContainerPx(window.innerHeight - VIEWPORT_MARGIN_PX);
+      } else {
+        setContainerPx(contentPx == null ? null : Math.min(contentPx, window.innerHeight * 0.92));
+      }
     };
     measure();
-    const ro = new ResizeObserver(measure);
-    if (handleRef.current) ro.observe(handleRef.current);
-    if (contentInnerRef.current) ro.observe(contentInnerRef.current);
+    if (!hasViewportDetent) return;
     window.addEventListener('resize', measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', measure);
-    };
-  }, [open]);
+    return () => window.removeEventListener('resize', measure);
+  }, [mounted, hasViewportDetent, contentPx]);
+
+  const resolvedDetents = useMemo(
+    () => resolveDetents(detents, { containerPx, contentPx }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [detents, containerPx, contentPx],
+  );
+  const dismissY = containerPx;
+
+  function goToDetent(index, velocity) {
+    if (!resolvedDetents?.[index]) return;
+    detentIndexRef.current = index;
+    if (reducedMotion.current) spring.current.jumpTo(resolvedDetents[index].translateY);
+    else spring.current.setTarget(resolvedDetents[index].translateY, { velocity });
+  }
+
+  function beginClose(velocity) {
+    setClosing(true);
+    const target = dismissY ?? 0;
+    // Reduced motion (or closing before the sheet ever finished measuring)
+    // has no animation to wait on, so finalize immediately rather than
+    // relying on the spring subscriber below to notice it "settled" — a
+    // `jumpTo` stops the animation loop and never fires another frame.
+    if (reducedMotion.current || dismissY == null) {
+      spring.current.jumpTo(target);
+      onCloseRef.current?.();
+      setMounted(false);
+    } else {
+      spring.current.setTarget(target, { velocity });
+    }
+  }
+
+  // Drive the entrance the same way every other transition happens — spring
+  // from fully off-screen to the initial detent — once we know how tall
+  // things are. Interruptible for free: it's the same spring every gesture
+  // below reads from and writes to. Layout effect so the first paint never
+  // shows the default (0, 0) motion state — that would flash a multi-detent
+  // sheet open at its tallest detent for a frame before snapping to the
+  // configured initial one.
+  useLayoutEffect(() => {
+    if (!open || enteredRef.current || !resolvedDetents || dismissY == null) return;
+    enteredRef.current = true;
+    const startIndex = Math.max(
+      0,
+      detents.findIndex((d) => d.key === (initialDetent ?? detents[0].key)),
+    );
+    detentIndexRef.current = startIndex;
+    spring.current.jumpTo(dismissY);
+    if (reducedMotion.current) spring.current.jumpTo(resolvedDetents[startIndex].translateY);
+    else spring.current.setTarget(resolvedDetents[startIndex].translateY);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, resolvedDetents, dismissY]);
+
+  // If the content behind the *current* detent genuinely changes size after
+  // the initial entrance — the dining map pin sheet swapping to a different
+  // pin while sitting at `medium`, "replacing content in place" per the spec
+  // — glide to match, but only while at rest, so this can't interrupt a drag
+  // or fight an in-flight settle.
+  useEffect(() => {
+    if (!open || !enteredRef.current || !resolvedDetents || !spring.current.settled) return;
+    const target = resolvedDetents[detentIndexRef.current]?.translateY;
+    if (target == null || Math.abs(spring.current.value - target) < 0.5) return;
+    if (reducedMotion.current) spring.current.jumpTo(target);
+    else spring.current.setTarget(target);
+  }, [open, resolvedDetents]);
+
+  // Subscribe the spring's per-frame value into render state (translate +
+  // backdrop opacity, the latter a continuous function of position so it
+  // never needs its own separate timed fade).
+  useEffect(() => {
+    const unsubscribe = spring.current.subscribe((y) => {
+      const ref = dismissY || 1;
+      const opacity = BACKDROP_MAX_OPACITY * Math.min(1, Math.max(0, 1 - y / ref));
+      setMotion({ y, opacity });
+      if (closing && spring.current.settled) {
+        onCloseRef.current?.();
+        setMounted(false);
+      }
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closing, dismissY]);
+
+  // Auto-promote to the next taller detent if content genuinely outgrows the
+  // current one (e.g. the dining map pin's accordion expanding past `medium`)
+  // — one-directional only, never demotes on its own, so this can't turn into
+  // the same live-resnapping bug the frozen "content" detent above fixes.
+  useEffect(() => {
+    if (!open || !resolvedDetents || resolvedDetents.length < 2 || !contentInnerRef.current) return;
+    const el = contentInnerRef.current;
+    const ro = new ResizeObserver(() => {
+      const measured = (handleRef.current?.offsetHeight || 0) + el.offsetHeight + CONTENT_MARGIN_PX;
+      const idx = detentIndexRef.current;
+      if (idx > 0 && measured > resolvedDetents[idx].px + 4) goToDetent(idx - 1);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, resolvedDetents]);
 
   useEffect(() => {
     if (!open) return;
@@ -311,24 +504,26 @@ export const Sheet = forwardRef(function Sheet(
     };
   }, [open]);
 
-  // --- drag to dismiss / expand ------------------------------------------
+  // --- drag: scroll/drag arbitration + detent stepping -------------------
   useEffect(() => {
-    if (!open) return;
+    if (!open || !resolvedDetents) return;
     const handle = handleRef.current;
     const content = contentRef.current;
     if (!handle || !content) return;
 
-    const g = { startY: null, startScrollTop: 0, origin: null, engaged: false, startT: 0, lastY: 0, lastT: 0 };
+    const g = { startY: null, origin: null, engaged: false, startT: 0, lastY: 0, lastT: 0, startValue: 0 };
 
     const makeStart = (origin) => (e) => {
       if (e.touches.length !== 1) return;
       g.startY = e.touches[0].clientY;
       g.lastY = g.startY;
-      g.startT = Date.now();
+      g.startT = performance.now();
       g.lastT = g.startT;
       g.origin = origin;
       g.engaged = false;
       g.startScrollTop = content.scrollTop;
+      g.scrollable = content.scrollHeight > content.clientHeight + 1;
+      g.startValue = spring.current.value;
     };
     const onHandleStart = makeStart('handle');
     const onContentStart = makeStart('content');
@@ -339,55 +534,52 @@ export const Sheet = forwardRef(function Sheet(
       const delta = t.clientY - g.startY;
 
       if (!g.engaged) {
-        // Only hijack the content's own scroll when it's already at the top —
-        // otherwise this would fight normal scrolling at the full detent.
-        const atTop = g.origin === 'handle' || g.startScrollTop <= 0;
-        if (g.origin === 'handle') g.engaged = true;
-        else if (atTop && Math.abs(delta) > 8) g.engaged = true;
-        else return;
+        if (g.origin === 'handle') {
+          g.engaged = true;
+        } else {
+          // Content only ever hands its own pan to the sheet when it's
+          // already scrolled to the top and the pan is headed down — panning
+          // up at the top is left to native scroll (with momentum) rather
+          // than grabbed, and content shorter than its box always drags.
+          const atTop = g.startScrollTop <= 0;
+          if (!g.scrollable || (atTop && delta > 8)) g.engaged = true;
+          else return;
+        }
+        // Grabbing mid-animation (e.g. mid-settle from a previous release)
+        // must stop the spring's own rAF loop, or it fights the direct
+        // `setValue` calls below for the rest of the drag.
+        if (g.engaged) spring.current.stop();
       }
 
       e.preventDefault();
       g.lastY = t.clientY;
-      g.lastT = Date.now();
-      setDragging(true);
+      g.lastT = performance.now();
 
-      if (delta < 0) {
-        // Swipe up: snap straight to the full detent past a small threshold
-        // rather than live-growing an auto-sized box.
-        if (detentRef.current !== 'full' && delta < -SHEET_EXPAND_PX) {
-          setDetent('full');
-          g.startY = null;
-          g.engaged = false;
-          setDragging(false);
-          setDragY(0);
-          return;
-        }
-        setDragY(0);
-      } else {
-        setDragY(delta);
-      }
+      const min = resolvedDetents[0].translateY; // 0 — the tallest detent
+      const raw = g.startValue + delta;
+      const rubberBanded = raw < min ? min + (raw - min) / 3 : raw;
+      spring.current.setValue(Math.min(rubberBanded, dismissY ?? rubberBanded));
     };
 
     const onEnd = () => {
       if (g.startY === null) return;
       const wasEngaged = g.engaged;
       const finalDelta = g.lastY - g.startY;
-      const dt = Math.max(1, g.lastT - g.startT);
-      const velocity = finalDelta / dt;
+      const dtSeconds = Math.max(1, g.lastT - g.startT) / 1000;
+      const velocityPxS = finalDelta / dtSeconds;
       g.startY = null;
       g.engaged = false;
-      setDragging(false);
-      setDragY(0);
-
       if (!wasEngaged) return;
-      const past = finalDelta > SHEET_DISMISS_PX || velocity > SHEET_FLICK_VELOCITY;
-      if (detentRef.current === 'full') {
-        if (past) setDetent('partial');
-      } else if (past) {
-        setClosing(true);
-        window.setTimeout(() => onCloseRef.current?.(), 260);
-      }
+
+      const releaseIndex = resolveRelease({
+        resolvedDetents,
+        dismissY,
+        fromIndex: detentIndexRef.current,
+        y: spring.current.value,
+        velocityPxS,
+      });
+      if (releaseIndex >= resolvedDetents.length) beginClose(velocityPxS);
+      else goToDetent(releaseIndex, velocityPxS);
     };
 
     handle.addEventListener('touchstart', onHandleStart, { passive: true });
@@ -408,27 +600,55 @@ export const Sheet = forwardRef(function Sheet(
       handle.removeEventListener('touchcancel', onEnd);
       content.removeEventListener('touchcancel', onEnd);
     };
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, resolvedDetents, dismissY]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
-  const heightStyle = detent === 'full' ? 'calc(100dvh - env(safe-area-inset-top) - 8px)' : partialPx != null ? `${partialPx}px` : undefined;
-  const translateY = closing ? '100%' : `${Math.max(0, dragY)}px`;
+  const ready = resolvedDetents != null && containerPx != null;
+  const heightPx = containerPx;
+  // Near-fully-transparent (the map pin sheet's `peek`) means the map
+  // underneath reads as usable — a full-screen click-catcher at that point
+  // would silently eat taps on pins instead of letting them reach the map,
+  // breaking "tap a different pin while open." Has to go on the outer
+  // `fixed inset-0` wrapper, not just the backdrop div — that wrapper covers
+  // the whole viewport too and would otherwise still catch the hit-test even
+  // with the backdrop itself made non-interactive.
+  const mapPassThrough = motion.opacity < BACKDROP_MAX_OPACITY * 0.15;
 
   // Portalled to <body>: the screen's entry animation establishes a containing
   // block, which would otherwise trap this `fixed` overlay inside the scroll area.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
-      <div className="backdrop-enter absolute inset-0 bg-black/40" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      role="dialog"
+      aria-modal="true"
+      style={{ pointerEvents: mapPassThrough ? 'none' : 'auto' }}
+    >
       <div
-        className={`sheet-enter relative flex w-full max-w-[560px] flex-col rounded-t-[14px] bg-bg shadow-2xl ${heightStyle ? '' : 'max-h-[92vh]'}`}
+        className={reducedMotion.current ? 'transition-opacity duration-150' : ''}
+        style={{ position: 'absolute', inset: 0, background: '#000', opacity: motion.opacity }}
+        onClick={onClose}
+      />
+      <div
+        className={`relative flex w-full max-w-[560px] flex-col rounded-t-[var(--radius-sheet)] bg-bg shadow-2xl ${
+          reducedMotion.current ? 'transition-opacity duration-150' : ''
+        } ${ready ? '' : 'max-h-[92vh]'}`}
         style={{
-          height: heightStyle,
-          transform: `translateY(${translateY})`,
-          transition: dragging ? 'none' : 'height 340ms var(--ease-ios), transform 340ms var(--ease-ios)',
+          height: heightPx != null ? `${heightPx}px` : undefined,
+          transform: `translate3d(0, ${ready ? motion.y : heightPx || 0}px, 0)`,
+          visibility: ready ? 'visible' : 'hidden',
+          opacity: reducedMotion.current ? (closing ? 0 : 1) : 1,
+          // Re-enable regardless of the wrapper above — the sheet itself
+          // (handle, content, close button) must stay interactive even while
+          // passed-through at `peek`.
+          pointerEvents: 'auto',
         }}
       >
-        <div ref={handleRef} className="ios-blur shrink-0 rounded-t-[14px] border-b border-separator/60 pt-2 pb-3">
+        <div
+          ref={handleRef}
+          className="ios-blur shrink-0 rounded-t-[var(--radius-sheet)] border-b border-separator/60 pt-2 pb-3"
+        >
           <div className="mx-auto mb-2 h-[5px] w-[36px] rounded-full bg-fill-strong" />
           <div className="flex items-center justify-between px-4">
             <button

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
   Badge,
@@ -25,7 +25,6 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
-  const pinSheetRef = useRef(null);
 
   useEffect(() => {
     onMapModeChange?.(view === 'map');
@@ -125,7 +124,6 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
         </div>
 
         <MapPinSheet
-          sheetRef={pinSheetRef}
           pin={selectedPin}
           statusOf={statusOf}
           hoursOf={hoursOf}
@@ -212,13 +210,25 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
 }
 
 /* -------------------------------------------------------------------------- */
-/* Bottom sheet for a selected map pin. Tapping a venue expands its details    */
-/* inline as a single-open accordion row — no second modal stacked on top —    */
-/* and snaps the sheet to the full detent so the expanded content isn't        */
-/* cramped.                                                                    */
+/* Bottom sheet for a selected map pin: peek (name + status), medium (the full  */
+/* collapsed venue list — the ceiling, most of the time) and full (only if an   */
+/* expanded venue's details actually don't fit in medium — Sheet promotes to    */
+/* it on its own via a resize check, so tapping a venue never forces "full"     */
+/* when it doesn't need to). Tapping a venue expands its details inline as a    */
+/* single-open accordion row — no second modal stacked on top.                  */
 /* -------------------------------------------------------------------------- */
 
-function MapPinSheet({ sheetRef, pin, statusOf, hoursOf, resolveTarget, onClose }) {
+// "Roughly a header's height" — tuned by eye, not measured, since peek only
+// ever needs to show the pin's name (already in the sheet's title bar) and
+// the first venue row's status at a glance.
+const MAP_PIN_PEEK_PX = 108;
+const MAP_PIN_DETENTS = [
+  { key: 'full', height: 'viewport' },
+  { key: 'medium', height: 'content' },
+  { key: 'peek', height: MAP_PIN_PEEK_PX },
+];
+
+function MapPinSheet({ pin, statusOf, hoursOf, resolveTarget, onClose }) {
   const [expandedName, setExpandedName] = useState(null);
 
   useEffect(() => {
@@ -228,15 +238,18 @@ function MapPinSheet({ sheetRef, pin, statusOf, hoursOf, resolveTarget, onClose 
   if (!pin) return null;
 
   const toggle = (name) => {
-    const next = expandedName === name ? null : name;
-    setExpandedName(next);
-    // A state updater must stay pure — calling another component's imperative
-    // method has to happen here, as a plain side effect of the click, not inside it.
-    if (next) sheetRef.current?.expand();
+    setExpandedName((current) => (current === name ? null : name));
   };
 
   return (
-    <Sheet ref={sheetRef} open={Boolean(pin)} onClose={onClose} title={pin.label}>
+    <Sheet
+      open={Boolean(pin)}
+      onClose={onClose}
+      title={pin.label}
+      detents={MAP_PIN_DETENTS}
+      initialDetent="medium"
+      contentKey={pin.id}
+    >
       <ListGroup className="mt-1">
         {pin.venues.map((venue, i) => {
           const isOpen = expandedName === venue.name;

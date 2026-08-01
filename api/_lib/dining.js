@@ -1,5 +1,5 @@
 import { fetchText } from './http.js';
-import { attr, blocksByClass, decodeEntities, textOf } from './html.js';
+import { attr, blocksByClass, decodeEntities, firstSentences, textOf } from './html.js';
 
 export const DINING_BASE = 'https://www.umassdining.com';
 
@@ -223,7 +223,7 @@ export function parseRetailListing(html, categorySlug) {
       category: categorySlug,
       hoursText: hoursText || null,
       status: classifyHours(hoursText),
-      description: teaser ? textOf(teaser[1]) : null,
+      description: teaser ? firstSentences(textOf(teaser[1])) : null,
       image: img ? absolute(img[1]) : null,
       infoUrl: infoLink ? absolute(infoLink[1]) : null,
       menuUrl: menuLink ? absolute(menuLink[1]) : null,

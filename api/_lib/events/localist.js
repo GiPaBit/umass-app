@@ -1,4 +1,5 @@
 import { fetchJson } from '../http.js';
+import { firstSentences } from '../html.js';
 
 const API = 'https://events.umass.edu/api/2/events';
 
@@ -67,6 +68,6 @@ function normalize(e) {
 
 function cleanText(str) {
   if (!str) return null;
-  const trimmed = str.replace(/\s+/g, ' ').trim();
-  return trimmed.length > 600 ? `${trimmed.slice(0, 600)}…` : trimmed;
+  const trimmed = firstSentences(str.replace(/\s+/g, ' ').trim());
+  return trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
 }

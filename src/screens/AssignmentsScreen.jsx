@@ -137,8 +137,9 @@ export function AssignmentsScreen({ onOpenSettings }) {
       title="Assignments"
       subtitle={`${pending.length} open${completed.length ? ` · ${completed.length} done` : ''}`}
       onRefresh={refresh}
+      scrollTopButton
     >
-      <div className="px-4 pt-1 pb-1">
+      <div className="sticky top-10 z-[5] bg-bg px-4 pt-1 pb-1">
         <SegmentedControl options={VIEWS} value={view} onChange={setView} />
       </div>
 

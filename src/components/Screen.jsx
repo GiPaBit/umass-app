@@ -1,11 +1,13 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Spinner } from './ui.jsx';
+import { RoundButton, Spinner } from './ui.jsx';
+import { ChevronIcon } from './Icons.jsx';
 import { TitleMenu } from './TitleMenu.jsx';
 
 const PULL_TRIGGER = 68; // px of pull needed to fire a refresh
 const PULL_MAX = 110; // hard stop so the content never flies off screen
 const RESISTANCE = 0.52; // finger travel -> content travel, giving rubber-band feel
 const SHRINK_OVER = 56; // px of scroll across which the title collapses
+const SCROLL_TOP_THRESHOLD = 90; // px of scroll before the floating scroll-to-top button appears
 
 /**
  * A full tab screen.
@@ -21,12 +23,17 @@ const SHRINK_OVER = 56; // px of scroll across which the title collapses
  * `titleMenu={{ options, value, onChange }}` renders the title as a tappable
  * dropdown instead of plain text (used by the Rec & Sports screen to switch
  * between RecWell and Sports). A parent can also grab `scrollToTop()` off a ref
- * to this component — there's no way to detect an iOS PWA's status-bar tap from
- * the DOM, so callers build their own floating "scroll to top" affordance and
- * drive it through this instead.
+ * to this component.
+ *
+ * There's no DOM API for an iOS PWA's status-bar tap, so this ships two
+ * fallbacks instead: the whole title bar is itself a tap target that scrolls to
+ * top (tapping `titleMenu`'s own button/dropdown still takes priority — it
+ * stops the click from bubbling here), and `scrollTopButton` opts a screen into
+ * a built-in floating button, top-right, once scrolled past
+ * `SCROLL_TOP_THRESHOLD`.
  */
 export const Screen = forwardRef(function Screen(
-  { title, titleMenu, children, onRefresh, trailing, subtitle, onScroll },
+  { title, titleMenu, children, onRefresh, trailing, subtitle, onScroll, scrollTopButton = false },
   ref,
 ) {
   const scrollRef = useRef(null);
@@ -34,9 +41,12 @@ export const Screen = forwardRef(function Screen(
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const scrollToTop = useCallback(() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), []);
 
   useImperativeHandle(ref, () => ({
-    scrollToTop: () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }),
+    scrollToTop,
     getScrollTop: () => scrollRef.current?.scrollTop ?? 0,
   }));
 
@@ -50,6 +60,7 @@ export const Screen = forwardRef(function Screen(
       frame = requestAnimationFrame(() => {
         frame = 0;
         setProgress(Math.min(1, Math.max(0, el.scrollTop / SHRINK_OVER)));
+        if (scrollTopButton) setShowScrollTop(el.scrollTop > SCROLL_TOP_THRESHOLD);
         onScroll?.(el.scrollTop);
       });
     };
@@ -145,9 +156,16 @@ export const Screen = forwardRef(function Screen(
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       {/* Floating actions — their own icons in the corner, not a bar. */}
-      {trailing && (
+      {(trailing || (scrollTopButton && showScrollTop)) && (
         <div className="absolute top-0 right-2 z-30 flex items-center gap-1" style={{ marginTop: 'env(safe-area-inset-top)' }}>
-          <div className="flex items-center gap-1 pt-2">{trailing}</div>
+          <div className="flex items-center gap-1 pt-2">
+            {scrollTopButton && showScrollTop && (
+              <RoundButton onClick={scrollToTop} label="Scroll to top">
+                <ChevronIcon width={18} height={18} style={{ transform: 'rotate(-90deg)' }} />
+              </RoundButton>
+            )}
+            {trailing}
+          </div>
         </div>
       )}
 
@@ -186,9 +204,12 @@ export const Screen = forwardRef(function Screen(
           transition: dragging ? 'none' : 'transform 320ms var(--ease-ios)',
         }}
       >
-        {/* Title: sticks to the top and shrinks in place. */}
+        {/* Title: sticks to the top and shrinks in place. Doubles as a tap-to-top
+            target — the closest web equivalent to iOS's status-bar tap — since
+            `titleMenu` stops its own clicks from bubbling here. */}
         <div
           className="sticky top-0 z-10 px-4"
+          onClick={scrollToTop}
           style={{
             paddingTop: `${titleTop + 8}px`,
             paddingBottom: `${8 + 4 * (1 - progress)}px`,

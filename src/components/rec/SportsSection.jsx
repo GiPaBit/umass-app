@@ -12,7 +12,7 @@ export function SportsSection({ data }) {
   const [tab, setTab] = useState('intramural');
   return (
     <>
-      <div className="px-4 pt-1 pb-1">
+      <div className="sticky top-10 z-[5] bg-bg px-4 pt-1 pb-1">
         <SegmentedControl options={TABS} value={tab} onChange={setTab} />
       </div>
       {tab === 'intramural' && <IntramuralTab data={data} />}

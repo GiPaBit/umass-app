@@ -58,13 +58,14 @@ export function EventsScreen() {
       title="Events"
       subtitle={data || quickEvents.length ? `${filtered.length} upcoming` : undefined}
       onRefresh={refresh}
+      scrollTopButton
       trailing={
         <RoundButton onClick={() => setAdding(true)} label="Quick add an event">
           <PlusIcon />
         </RoundButton>
       }
     >
-      <div className="px-4 pt-1 pb-1">
+      <div className="sticky top-10 z-[5] bg-bg px-4 pt-1 pb-1">
         <SegmentedControl options={FILTERS} value={filter} onChange={setFilter} />
       </div>
 

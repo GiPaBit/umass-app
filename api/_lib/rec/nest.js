@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { firstSentences } from '../html.js';
 import { findLinkByLabel, parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
 /**
@@ -27,7 +28,7 @@ export async function getNest() {
 
   return {
     nest: {
-      overview: firstSection ? firstSection.lines.join(' ') : null,
+      overview: firstSection ? firstSentences(firstSection.lines.join(' ')) : null,
       // "Book time on the SkyPark" — the individual/small-group booking link.
       bookingUrl: findLinkByLabel(sections, /book.*skypark|skypark/i) || `${REC_BASE}${REC_PAGES.nest}`,
       // Group programs (Break the Ice, Building the NEST, etc.) go through a request form, not a live slot picker.

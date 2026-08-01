@@ -28,6 +28,18 @@ export function textOf(html = '') {
     .trim();
 }
 
+/**
+ * First `n` sentences of already-clean text — blurbs across the app are capped
+ * at 2 sentences, enforced here at the source rather than trusted to every
+ * screen that renders one.
+ */
+export function firstSentences(text, n = 2) {
+  if (!text) return text;
+  const sentences = text.match(/[^.!?]+[.!?]+(?:['")\]]+)?(?=\s|$)/g);
+  if (!sentences || sentences.length <= n) return text.trim();
+  return sentences.slice(0, n).join(' ').trim();
+}
+
 /** Read one attribute out of a single tag's source, tolerating single or double quotes. */
 export function attr(tagSource, name) {
   const m =

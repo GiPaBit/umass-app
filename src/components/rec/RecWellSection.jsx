@@ -16,7 +16,7 @@ export function RecWellSection({ data }) {
   const [tab, setTab] = useState('hours');
   return (
     <>
-      <div className="px-4 pt-1 pb-1">
+      <div className="sticky top-10 z-[5] bg-bg px-4 pt-1 pb-1">
         <SegmentedControl options={TABS} value={tab} onChange={setTab} />
       </div>
       {tab === 'hours' && <HoursTab data={data} />}

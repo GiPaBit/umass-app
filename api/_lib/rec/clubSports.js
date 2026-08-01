@@ -52,12 +52,21 @@ export async function getClubSports() {
   };
 }
 
-/** Pull the first non-Engage link out of a club's HTML description/summary, if any. */
+// Some clubs' Engage descriptions link out to a citation or reference source
+// mid-prose (e.g. Quidditch Club linking Wikipedia's "Muggle Quidditch" article
+// to explain the sport) rather than the club's own page — those aren't a real
+// "visit us" link, so skip them and fall back to the official Engage page.
+const NON_CLUB_LINK_DOMAINS = /wikipedia\.org|wiktionary\.org/i;
+
+/** Pull the first non-Engage, non-reference link out of a club's HTML description/summary, if any. */
 function extractExternalLink(html) {
   if (!html) return null;
-  const m = html.match(/<a\b[^>]*href="([^"]+)"/i);
-  if (!m) return null;
-  const url = m[1];
-  if (/campuslabs\.com/i.test(url)) return null;
-  return url;
+  const re = /<a\b[^>]*href="([^"]+)"/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const url = m[1];
+    if (/campuslabs\.com/i.test(url) || NON_CLUB_LINK_DOMAINS.test(url)) continue;
+    return url;
+  }
+  return null;
 }

@@ -1,6 +1,5 @@
 import { SectionHeader } from '../ui.jsx';
 import { FaqSection, RecSections } from './FaqSection.jsx';
-import { ExpandableText } from './ExpandableText.jsx';
 
 /** Climbing has no occupancy indicator by design — no live feed exists and there's no historical data to build even a static histogram from. */
 export function AdventureTab({ data }) {
@@ -10,7 +9,12 @@ export function AdventureTab({ data }) {
     <>
       <SectionHeader>RockWell Climbing Gym</SectionHeader>
       <div className="mx-4 overflow-hidden rounded-[16px] bg-card p-4">
-        <ExpandableText text={climbing.overview} />
+        {climbing.overview && <p className="text-[14px] leading-[19px] text-label-2">{climbing.overview}</p>}
+        {climbing.url && (
+          <a href={climbing.url} target="_blank" rel="noreferrer" className="mt-1.5 inline-block text-[13px] font-medium text-ios-blue">
+            See website for more →
+          </a>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <a
             href={climbing.orientationUrl}
@@ -48,7 +52,12 @@ export function AdventureTab({ data }) {
 
       <SectionHeader>NEST Challenge Course</SectionHeader>
       <div className="mx-4 overflow-hidden rounded-[16px] bg-card p-4">
-        <ExpandableText text={nest.overview} />
+        {nest.overview && <p className="text-[14px] leading-[19px] text-label-2">{nest.overview}</p>}
+        {nest.url && (
+          <a href={nest.url} target="_blank" rel="noreferrer" className="mt-1.5 inline-block text-[13px] font-medium text-ios-blue">
+            See website for more →
+          </a>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <a
             href={nest.bookingUrl}

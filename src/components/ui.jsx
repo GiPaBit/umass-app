@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckIcon, ChevronIcon, CloseIcon, ExternalIcon, RefreshIcon } from './Icons.jsx';
 
@@ -217,11 +217,90 @@ export function Button({ children, variant = 'filled', onClick, type = 'button',
 /* Sheet                                                                        */
 /* -------------------------------------------------------------------------- */
 
-/** Bottom sheet with a grabber, mirroring UISheetPresentationController. */
-export function Sheet({ open, onClose, title, children, action }) {
+const SHEET_DISMISS_PX = 90; // dragged down this far (or a fast flick) counts as "let go"
+const SHEET_EXPAND_PX = 36; // dragged up this far snaps straight to the full detent
+const SHEET_FLICK_VELOCITY = 0.55; // px/ms — a fast flick overrides the distance thresholds
+
+/**
+ * Bottom sheet with a real drag handle, two detents (partial/full), swipe-down
+ * to dismiss and swipe-up to expand. Used for every modal/popup surface in the
+ * app so gesture behavior only has to be right in one place.
+ *
+ * Drag detection lives on raw DOM listeners (not JSX touch props) because React
+ * attaches JSX touch handlers as passive — `preventDefault()` there is silently
+ * ignored, same reason `Screen.jsx`'s pull-to-refresh does the same thing.
+ *
+ * `ref` exposes `expand()` / `collapse()` / `close()` so a parent can drive the
+ * sheet programmatically (e.g. auto-expanding when an accordion row opens).
+ */
+export const Sheet = forwardRef(function Sheet(
+  { open, onClose, title, children, action, initialDetent = 'partial' },
+  ref,
+) {
+  const handleRef = useRef(null);
+  const contentRef = useRef(null);
+  const contentInnerRef = useRef(null);
+  const detentRef = useRef(initialDetent);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const [detent, setDetentState] = useState(initialDetent);
+  const [partialPx, setPartialPx] = useState(null);
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  const setDetent = (next) => {
+    detentRef.current = next;
+    setDetentState(next);
+  };
+
+  useImperativeHandle(ref, () => ({
+    expand: () => setDetent('full'),
+    collapse: () => setDetent('partial'),
+    close: () => onCloseRef.current?.(),
+  }));
+
+  // Reset to a clean state every time the sheet (re)opens.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    setDetent(initialDetent);
+    setClosing(false);
+    setDragY(0);
+    setDragging(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Measure the partial detent from actual content, capped at 92vh — the same
+  // ceiling the old fixed-height sheet used — so short content still looks
+  // content-sized instead of always opening at a fixed fraction of the screen.
+  //
+  // Observing `contentInnerRef` (the unconstrained wrapper around `children`)
+  // rather than the scrollable `contentRef` itself matters: `contentRef`'s own
+  // box is pinned by the flex layout once a height is set, so it never resizes
+  // even when the content inside it shrinks or grows — ResizeObserver watches
+  // an element's rendered box, not its `scrollHeight`.
+  useEffect(() => {
+    if (!open) return;
+    const measure = () => {
+      const h = handleRef.current?.offsetHeight || 0;
+      const c = contentInnerRef.current?.offsetHeight || 0;
+      setPartialPx(Math.min(h + c + 24, window.innerHeight * 0.92));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (handleRef.current) ro.observe(handleRef.current);
+    if (contentInnerRef.current) ro.observe(contentInnerRef.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && onCloseRef.current?.();
     document.addEventListener('keydown', onKey);
     // Stop the page behind the sheet from scrolling.
     const prev = document.body.style.overflow;
@@ -230,36 +309,151 @@ export function Sheet({ open, onClose, title, children, action }) {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open]);
+
+  // --- drag to dismiss / expand ------------------------------------------
+  useEffect(() => {
+    if (!open) return;
+    const handle = handleRef.current;
+    const content = contentRef.current;
+    if (!handle || !content) return;
+
+    const g = { startY: null, startScrollTop: 0, origin: null, engaged: false, startT: 0, lastY: 0, lastT: 0 };
+
+    const makeStart = (origin) => (e) => {
+      if (e.touches.length !== 1) return;
+      g.startY = e.touches[0].clientY;
+      g.lastY = g.startY;
+      g.startT = Date.now();
+      g.lastT = g.startT;
+      g.origin = origin;
+      g.engaged = false;
+      g.startScrollTop = content.scrollTop;
+    };
+    const onHandleStart = makeStart('handle');
+    const onContentStart = makeStart('content');
+
+    const onMove = (e) => {
+      if (g.startY === null) return;
+      const t = e.touches[0];
+      const delta = t.clientY - g.startY;
+
+      if (!g.engaged) {
+        // Only hijack the content's own scroll when it's already at the top —
+        // otherwise this would fight normal scrolling at the full detent.
+        const atTop = g.origin === 'handle' || g.startScrollTop <= 0;
+        if (g.origin === 'handle') g.engaged = true;
+        else if (atTop && Math.abs(delta) > 8) g.engaged = true;
+        else return;
+      }
+
+      e.preventDefault();
+      g.lastY = t.clientY;
+      g.lastT = Date.now();
+      setDragging(true);
+
+      if (delta < 0) {
+        // Swipe up: snap straight to the full detent past a small threshold
+        // rather than live-growing an auto-sized box.
+        if (detentRef.current !== 'full' && delta < -SHEET_EXPAND_PX) {
+          setDetent('full');
+          g.startY = null;
+          g.engaged = false;
+          setDragging(false);
+          setDragY(0);
+          return;
+        }
+        setDragY(0);
+      } else {
+        setDragY(delta);
+      }
+    };
+
+    const onEnd = () => {
+      if (g.startY === null) return;
+      const wasEngaged = g.engaged;
+      const finalDelta = g.lastY - g.startY;
+      const dt = Math.max(1, g.lastT - g.startT);
+      const velocity = finalDelta / dt;
+      g.startY = null;
+      g.engaged = false;
+      setDragging(false);
+      setDragY(0);
+
+      if (!wasEngaged) return;
+      const past = finalDelta > SHEET_DISMISS_PX || velocity > SHEET_FLICK_VELOCITY;
+      if (detentRef.current === 'full') {
+        if (past) setDetent('partial');
+      } else if (past) {
+        setClosing(true);
+        window.setTimeout(() => onCloseRef.current?.(), 260);
+      }
+    };
+
+    handle.addEventListener('touchstart', onHandleStart, { passive: true });
+    content.addEventListener('touchstart', onContentStart, { passive: true });
+    handle.addEventListener('touchmove', onMove, { passive: false });
+    content.addEventListener('touchmove', onMove, { passive: false });
+    handle.addEventListener('touchend', onEnd, { passive: true });
+    content.addEventListener('touchend', onEnd, { passive: true });
+    handle.addEventListener('touchcancel', onEnd, { passive: true });
+    content.addEventListener('touchcancel', onEnd, { passive: true });
+    return () => {
+      handle.removeEventListener('touchstart', onHandleStart);
+      content.removeEventListener('touchstart', onContentStart);
+      handle.removeEventListener('touchmove', onMove);
+      content.removeEventListener('touchmove', onMove);
+      handle.removeEventListener('touchend', onEnd);
+      content.removeEventListener('touchend', onEnd);
+      handle.removeEventListener('touchcancel', onEnd);
+      content.removeEventListener('touchcancel', onEnd);
+    };
+  }, [open]);
 
   if (!open) return null;
+
+  const heightStyle = detent === 'full' ? 'calc(100dvh - env(safe-area-inset-top) - 8px)' : partialPx != null ? `${partialPx}px` : undefined;
+  const translateY = closing ? '100%' : `${Math.max(0, dragY)}px`;
 
   // Portalled to <body>: the screen's entry animation establishes a containing
   // block, which would otherwise trap this `fixed` overlay inside the scroll area.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
       <div className="backdrop-enter absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="sheet-enter relative flex max-h-[92vh] w-full max-w-[560px] flex-col rounded-t-[14px] bg-bg shadow-2xl">
-        <div className="ios-blur flex shrink-0 items-center justify-between rounded-t-[14px] border-b border-separator/60 px-4 pt-3 pb-3">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="ios-press-scale -m-1 p-1 text-label-2"
-          >
-            <CloseIcon />
-          </button>
-          <div className="truncate px-2 text-[17px] font-semibold text-label">{title}</div>
-          <div className="min-w-[28px] text-right">{action}</div>
+      <div
+        className={`sheet-enter relative flex w-full max-w-[560px] flex-col rounded-t-[14px] bg-bg shadow-2xl ${heightStyle ? '' : 'max-h-[92vh]'}`}
+        style={{
+          height: heightStyle,
+          transform: `translateY(${translateY})`,
+          transition: dragging ? 'none' : 'height 340ms var(--ease-ios), transform 340ms var(--ease-ios)',
+        }}
+      >
+        <div ref={handleRef} className="ios-blur shrink-0 rounded-t-[14px] border-b border-separator/60 pt-2 pb-3">
+          <div className="mx-auto mb-2 h-[5px] w-[36px] rounded-full bg-fill-strong" />
+          <div className="flex items-center justify-between px-4">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="ios-press-scale -m-1 p-1 text-label-2"
+            >
+              <CloseIcon />
+            </button>
+            <div className="truncate px-2 text-[17px] font-semibold text-label">{title}</div>
+            <div className="min-w-[28px] text-right">{action}</div>
+          </div>
         </div>
-        <div className="ios-scroll no-scrollbar flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),20px)]">
-          {children}
+        <div
+          ref={contentRef}
+          className="ios-scroll no-scrollbar flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),20px)]"
+        >
+          <div ref={contentInnerRef}>{children}</div>
         </div>
       </div>
     </div>,
     document.body,
   );
-}
+});
 
 /* -------------------------------------------------------------------------- */
 /* States                                                                       */

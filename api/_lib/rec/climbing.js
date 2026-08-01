@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { firstSentences } from '../html.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
 /**
@@ -36,7 +37,7 @@ export async function getClimbing() {
 
   return {
     climbing: {
-      overview: firstSection ? firstSection.lines.join(' ') : null,
+      overview: firstSection ? firstSentences(firstSection.lines.join(' ')) : null,
       orientationUrl: ORIENTATION_URL,
       // No scrapeable date for Boulder Brawl — `when: null` means the UI shows
       // "Stay tuned!" instead of a fabricated date.

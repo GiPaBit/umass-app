@@ -1,5 +1,5 @@
 import { fetchText } from '../http.js';
-import { blocksByClass, decodeEntities, textOf } from '../html.js';
+import { blocksByClass, decodeEntities, firstSentences, textOf } from '../html.js';
 import { nowInAmherst } from '../dining.js';
 import { extractMain, parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
@@ -38,7 +38,7 @@ export async function getFitness() {
   }
 
   const firstSection = sections.find((s) => s.lines.length > 0);
-  const primer = firstSection ? firstSection.lines.join(' ') : null;
+  const primer = firstSection ? firstSentences(firstSection.lines.join(' ')) : null;
 
   return {
     fitness: {

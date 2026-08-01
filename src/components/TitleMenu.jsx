@@ -30,7 +30,7 @@ export function TitleMenu({ options, value, onChange, fontSize, lineHeight = 1.2
   const active = options.find((o) => o.value === value) || options[0];
 
   return (
-    <div ref={rootRef} className="relative inline-block">
+    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

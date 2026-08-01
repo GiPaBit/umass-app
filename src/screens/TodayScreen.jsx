@@ -100,6 +100,7 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
       title="Today"
       subtitle={dateLine}
       onRefresh={refresh}
+      scrollTopButton
       trailing={
         <RoundButton onClick={onOpenSettings} label="Settings">
           <GearIcon />

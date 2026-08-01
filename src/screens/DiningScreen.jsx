@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
   Badge,
@@ -14,7 +14,7 @@ import {
   StaleNotice,
   StatusPill,
 } from '../components/ui.jsx';
-import { CloseIcon } from '../components/Icons.jsx';
+import { ChevronIcon } from '../components/Icons.jsx';
 import { getDiningOverview, getHallMenu } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { CampusMap } from '../components/CampusMap.jsx';
@@ -25,6 +25,7 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
+  const pinSheetRef = useRef(null);
 
   useEffect(() => {
     onMapModeChange?.(view === 'map');
@@ -124,14 +125,13 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
         </div>
 
         <MapPinSheet
+          sheetRef={pinSheetRef}
           pin={selectedPin}
           statusOf={statusOf}
           hoursOf={hoursOf}
+          resolveTarget={resolveTarget}
           onClose={() => setSelectedPin(null)}
-          onSelectVenue={(name) => setDetailTarget(resolveTarget(name))}
         />
-
-        <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} />
       </div>
     );
   }
@@ -141,8 +141,9 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
       title="Dining"
       subtitle={data ? `${openCount} open right now` : undefined}
       onRefresh={refresh}
+      scrollTopButton
     >
-      <div className="px-4 pt-1 pb-1">
+      <div className="sticky top-10 z-[5] bg-bg px-4 pt-1 pb-1">
         <SegmentedControl
           options={[
             { value: 'list', label: 'List' },
@@ -211,60 +212,86 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
 }
 
 /* -------------------------------------------------------------------------- */
-/* Apple-Maps-style bottom sheet for a selected pin — not the full modal Sheet, */
-/* so the map stays visible and interactive above it.                          */
+/* Bottom sheet for a selected map pin. Tapping a venue expands its details    */
+/* inline as a single-open accordion row — no second modal stacked on top —    */
+/* and snaps the sheet to the full detent so the expanded content isn't        */
+/* cramped.                                                                    */
 /* -------------------------------------------------------------------------- */
 
-function MapPinSheet({ pin, statusOf, hoursOf, onClose, onSelectVenue }) {
+function MapPinSheet({ sheetRef, pin, statusOf, hoursOf, resolveTarget, onClose }) {
+  const [expandedName, setExpandedName] = useState(null);
+
+  useEffect(() => {
+    setExpandedName(null);
+  }, [pin?.id]);
+
   if (!pin) return null;
 
-  return (
-    <div
-      className="sheet-enter absolute inset-x-0 bottom-0 z-20 flex max-h-[50vh] flex-col rounded-t-[20px] bg-bg shadow-2xl"
-      style={{ minHeight: '32vh' }}
-    >
-      <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-2">
-        <div className="flex-1">
-          <div className="mx-auto mb-2 h-[5px] w-[36px] rounded-full bg-fill-strong" />
-          <h2 className="text-[19px] font-bold text-label">{pin.label}</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="ios-press-scale ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-fill text-label-2"
-        >
-          <CloseIcon width={16} height={16} />
-        </button>
-      </div>
+  const toggle = (name) => {
+    const next = expandedName === name ? null : name;
+    setExpandedName(next);
+    // A state updater must stay pure — calling another component's imperative
+    // method has to happen here, as a plain side effect of the click, not inside it.
+    if (next) sheetRef.current?.expand();
+  };
 
-      <div className="ios-scroll no-scrollbar flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),16px)]">
-        <ListGroup className="mt-1">
-          {pin.venues.map((venue, i) => (
-            <Row
-              key={venue.name}
-              last={i === pin.venues.length - 1}
-              onClick={() => onSelectVenue(venue.name)}
-              trailing={<StatusPill state={statusOf(venue.name)} />}
-            >
-              <div className="text-[17px] leading-[22px] text-label">{venue.name}</div>
-              <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                {hoursOf(venue.name) || venue.groupName}
+  return (
+    <Sheet ref={sheetRef} open={Boolean(pin)} onClose={onClose} title={pin.label}>
+      <ListGroup className="mt-1">
+        {pin.venues.map((venue, i) => {
+          const isOpen = expandedName === venue.name;
+          return (
+            <div key={venue.name} className={i === pin.venues.length - 1 ? '' : 'relative ios-separator'} style={{ '--sep-inset': '16px' }}>
+              <button
+                type="button"
+                onClick={() => toggle(venue.name)}
+                aria-expanded={isOpen}
+                className="ios-press flex w-full items-center gap-3 px-4 py-[11px] text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[17px] leading-[22px] text-label">{venue.name}</div>
+                  <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
+                    {hoursOf(venue.name) || venue.groupName}
+                  </div>
+                </div>
+                <StatusPill state={statusOf(venue.name)} />
+                <ChevronIcon
+                  className="shrink-0 text-label-3 transition-transform duration-300"
+                  style={{ transform: isOpen ? 'rotate(90deg)' : 'none', transitionTimingFunction: 'var(--ease-ios)' }}
+                />
+              </button>
+              <div
+                className="grid transition-[grid-template-rows] duration-300"
+                style={{ gridTemplateRows: isOpen ? '1fr' : '0fr', transitionTimingFunction: 'var(--ease-ios)' }}
+              >
+                <div className="overflow-hidden">{isOpen && <VenueDetail target={resolveTarget(venue.name)} />}</div>
               </div>
-            </Row>
-          ))}
-        </ListGroup>
-      </div>
-    </div>
+            </div>
+          );
+        })}
+      </ListGroup>
+    </Sheet>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 /* Shared venue detail — halls get today's hours + full menu, retail venues   */
-/* get hours + the scraped description. Both get a Location section.          */
+/* get hours + the scraped description. Both get a Location section. Used     */
+/* both as a full sheet (list view) and inline inside the map pin accordion.  */
 /* -------------------------------------------------------------------------- */
 
 function VenueDetailSheet({ target, onClose }) {
+  const isHall = target?.type === 'hall';
+  const name = isHall ? target.hall?.name : target?.venue?.name;
+
+  return (
+    <Sheet open={Boolean(target)} onClose={onClose} title={name || ''}>
+      {target && <VenueDetail target={target} />}
+    </Sheet>
+  );
+}
+
+function VenueDetail({ target }) {
   const isHall = target?.type === 'hall';
   const hall = isHall ? target.hall : null;
   const venue = !isHall ? target?.venue : null;
@@ -285,7 +312,7 @@ function VenueDetailSheet({ target, onClose }) {
   const links = name ? mapLinks({ name }) : null;
 
   return (
-    <Sheet open={Boolean(target)} onClose={onClose} title={name || ''}>
+    <>
       {isHall && loading && <LoadingState label="Loading menu…" />}
       {isHall && error && <ErrorState error={error} what="this menu" />}
 
@@ -428,7 +455,7 @@ function VenueDetailSheet({ target, onClose }) {
           ))}
         </>
       )}
-    </Sheet>
+    </>
   );
 }
 

@@ -19,7 +19,13 @@ export function WelcomeScreen({ onDone }) {
       style={{ background: '#14100F', color: '#FBF4F0', paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="ios-scroll no-scrollbar min-h-0 flex-1 overflow-y-auto px-7 pt-8">
-        <img src="/icons/icon-192.png" alt="" width={64} height={64} className="fade-up rounded-[16px]" />
+        <img
+          src={`${import.meta.env.BASE_URL}icons/icon-192.png`}
+          alt=""
+          width={64}
+          height={64}
+          className="fade-up rounded-[16px]"
+        />
 
         <p
           className="mt-5 text-[12px] font-extrabold tracking-[0.14em] uppercase"

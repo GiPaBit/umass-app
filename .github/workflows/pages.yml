@@ -52,7 +52,11 @@ jobs:
           # from configure-pages rather than hardcoded so it becomes "/" by itself if a
           # custom domain is ever added. Vite rewrites index.html's script, manifest
           # and icon URLs to match.
-          APP_BASE: ${{ steps.pages.outputs.base_path }}
+          # configure-pages' base_path has no trailing slash ("/umass-app", not
+          # "/umass-app/"), but every `${BASE_URL}icons/...` reference in the app
+          # assumes one — without it, base_path + "icons/..." glues together into
+          # ".../umass-appicons/..." (the 404 seen on Pages for icon-192.png).
+          APP_BASE: ${{ steps.pages.outputs.base_path }}/
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
 

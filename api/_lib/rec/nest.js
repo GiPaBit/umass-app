@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { firstSentences } from '../html.js';
 import { findLinkByLabel, parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
@@ -14,7 +15,7 @@ export async function getNest() {
   const failures = [];
   let sections = [];
   try {
-    const html = await fetchText(`${REC_BASE}${REC_PAGES.nest}`);
+    const html = await getOrFetch('rec:nest', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.nest}`));
     sections = parseRecSections(html);
   } catch (err) {
     failures.push({ what: 'NEST', error: String(err.message || err) });

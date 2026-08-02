@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { blocksByClass, decodeEntities, firstSentences, textOf } from '../html.js';
 import { nowInAmherst } from '../dining.js';
 import { extractMain, parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
@@ -19,8 +20,8 @@ const MONTHS = [
 export async function getFitness() {
   const failures = [];
   const [overviewResult, scheduleResult] = await Promise.allSettled([
-    fetchText(`${REC_BASE}${REC_PAGES.fitness}`),
-    fetchText(`${REC_BASE}${REC_PAGES.fitnessSchedule}`),
+    getOrFetch('rec:fitness:overview', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.fitness}`)),
+    getOrFetch('rec:fitness:schedule', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.fitnessSchedule}`)),
   ]);
 
   let sections = [];

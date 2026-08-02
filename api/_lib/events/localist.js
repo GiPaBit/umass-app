@@ -1,4 +1,5 @@
 import { fetchJson } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { firstSentences } from '../html.js';
 
 const API = 'https://events.umass.edu/api/2/events';
@@ -16,7 +17,9 @@ export const localistSource = {
     const events = [];
     // The API pages at 100/request; two pages is plenty for a three week window.
     for (let page = 1; page <= Math.ceil(max / 100); page++) {
-      const data = await fetchJson(`${API}?days=${days}&pp=100&page=${page}`);
+      const data = await getOrFetch(`events:localist:${days}:${page}`, TTL.EVENTS, () =>
+        fetchJson(`${API}?days=${days}&pp=100&page=${page}`),
+      );
       const batch = data?.events || [];
       for (const wrapper of batch) {
         const e = wrapper?.event;

@@ -199,6 +199,12 @@ export function parseLocationHours(html) {
  * today's hours already rendered, which is why the Today tab can show what's open
  * right now from just two requests.
  */
+// Food trucks have no fixed location/hours and are handled separately (see
+// src/lib/diningCatalog.js's `foodtrucks` group) — exclude them here so they
+// don't also show up duplicated under a retail category like "Cafes Around
+// Campus", which the site apparently lists them on too.
+const KNOWN_FOOD_TRUCKS = ['babyberk', 'babyberk2'];
+
 export function parseRetailListing(html, categorySlug) {
   const venues = [];
   const entryRe = /<h2 id="menu_item_title"[^>]*>([\s\S]*?)<\/h2>([\s\S]*?)(?=<h2 id="menu_item_title"|<\/ul>)/gi;
@@ -207,6 +213,7 @@ export function parseRetailListing(html, categorySlug) {
     const name = textOf(m[1]);
     const body = m[2];
     if (!name) continue;
+    if (KNOWN_FOOD_TRUCKS.includes(name.toLowerCase().replace(/[^a-z0-9]/g, ''))) continue;
 
     const hoursBlock = body.match(
       /<h3>\s*Today'?s Hours\s*<\/h3>\s*<div id="dining_location_text">([\s\S]*?)<\/div>/i,
@@ -218,11 +225,15 @@ export function parseRetailListing(html, categorySlug) {
     const img = body.match(/<img[^>]+src="([^"]+)"/i);
     const teaser = body.match(/<div id="teaser"[^>]*>\s*<p>([\s\S]*?)<\/p>/i);
 
+    const status = classifyHours(hoursText);
+    status.hoursText = hoursText || null;
+    status.opensLabel = opensLabel(status);
+
     venues.push({
       name,
       category: categorySlug,
       hoursText: hoursText || null,
-      status: classifyHours(hoursText),
+      status,
       description: teaser ? firstSentences(textOf(teaser[1])) : null,
       image: img ? absolute(img[1]) : null,
       infoUrl: infoLink ? absolute(infoLink[1]) : null,
@@ -310,4 +321,28 @@ function toMinutes(hour, minute, meridiem) {
 export function nowInAmherst() {
   const s = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
   return new Date(s);
+}
+
+/**
+ * Best-effort "when does this reopen" label from today's already-classified
+ * ranges. Only ever says "opens later today at H:MM" — the underlying scrape
+ * doesn't reliably distinguish which day of the week a given hours line
+ * applies to (see statusFromSections in api/dining.js), so guessing a
+ * specific "opens tomorrow"/"opens Monday" date would risk being wrong.
+ * Returns null when nothing useful can be said (already open, or closed with
+ * no later range known for today).
+ */
+export function opensLabel({ state, ranges } = {}, now = nowInAmherst()) {
+  if (state === 'open' || !ranges?.length) return null;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const later = ranges.find((r) => r.start > minutes);
+  return later ? `Opens at ${formatMinutes(later.start)}` : null;
+}
+
+function formatMinutes(mins) {
+  const h24 = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const suffix = h24 < 12 ? 'AM' : 'PM';
+  return m === 0 ? `${h12} ${suffix}` : `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }

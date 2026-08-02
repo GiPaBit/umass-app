@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { decodeEntities } from '../html.js';
 
 const RSS = 'https://umassathletics.com/calendar.ashx/calendar.rss';
@@ -14,7 +15,7 @@ export const athleticsSource = {
   url: 'https://umassathletics.com/calendar',
 
   async fetchEvents({ days = 21 } = {}) {
-    const xml = await fetchText(RSS);
+    const xml = await getOrFetch('events:athletics:rss', TTL.EVENTS, () => fetchText(RSS));
     const cutoff = Date.now() + days * 86400000;
 
     return parseItems(xml)

@@ -305,19 +305,19 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
                 }}
                 className="cursor-pointer"
               >
-                <ellipse cx="0" cy="2" rx="7" ry="2.5" fill="rgba(0,0,0,0.18)" />
+                <ellipse cx="0" cy="3" rx="10.5" ry="3.75" fill="rgba(0,0,0,0.18)" />
                 <path
-                  d="M0 0c-6.4-8-9.6-12.4-9.6-16.6A9.6 9.6 0 0 1 9.6-16.6C9.6-12.4 6.4-8 0 0Z"
+                  d="M0 0c-9.6-12-14.4-18.6-14.4-24.9A14.4 14.4 0 0 1 14.4-24.9C14.4-18.6 9.6-12 0 0Z"
                   fill={anyOpen ? 'var(--color-ios-green)' : 'var(--color-ios-red)'}
                   stroke="#fff"
-                  strokeWidth="2"
+                  strokeWidth="3"
                 />
                 {pin.venues.length > 1 ? (
                   <text
                     x="0"
-                    y="-13"
+                    y="-19.5"
                     textAnchor="middle"
-                    fontSize="11"
+                    fontSize="16"
                     fontWeight="700"
                     fill="#fff"
                     style={{ pointerEvents: 'none' }}
@@ -325,7 +325,7 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
                     {pin.venues.length}
                   </text>
                 ) : (
-                  <circle cx="0" cy="-16.6" r="3.4" fill="#fff" />
+                  <circle cx="0" cy="-24.9" r="5.1" fill="#fff" />
                 )}
               </g>
             );
@@ -334,7 +334,13 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
       </div>
 
       {/* Controls */}
-      <div className="absolute top-3 right-3 flex flex-col gap-1.5">
+      <div
+        className="absolute flex flex-col gap-1.5"
+        style={{
+          top: 'calc(env(safe-area-inset-top) + 12px)',
+          right: 'calc(env(safe-area-inset-right) + 12px)',
+        }}
+      >
         <MapButton label="Zoom in" onClick={() => zoomBy(1.5)}>
           +
         </MapButton>

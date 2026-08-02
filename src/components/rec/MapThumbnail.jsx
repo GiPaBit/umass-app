@@ -1,14 +1,11 @@
+import { isApplePlatform } from '../../lib/platform.js';
+
 /**
  * No Maps API key exists in this app (checked CLAUDE.md's env table — none
  * present), so this deliberately isn't a real static map tile — it's a styled
  * placeholder that deep-links to the platform's native maps app, same as every
  * other external link in the app (plain <a href>, no API key required).
  */
-function isApplePlatform() {
-  if (typeof navigator === 'undefined') return false;
-  return /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
-}
-
 export function MapThumbnail({ label, query }) {
   const href = isApplePlatform()
     ? `https://maps.apple.com/?q=${encodeURIComponent(query)}`

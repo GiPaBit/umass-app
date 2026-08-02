@@ -97,9 +97,28 @@ export const DINING_GROUPS = [
     selectAllOnGroup: false,
     // No coordinates (they move) and no location/hours data exists for either —
     // `noLocation` suppresses the Location section, map links and map pin.
+    // blurb/instagram/website are best-effort static info since the live site
+    // has no per-truck data beyond a name — TODO: confirm/replace with real
+    // copy and social links.
     venues: [
-      { name: 'BabyBerk', lat: null, lon: null, noLocation: true },
-      { name: 'BabyBerk2', lat: null, lon: null, noLocation: true },
+      {
+        name: 'BabyBerk',
+        lat: null,
+        lon: null,
+        noLocation: true,
+        blurb: 'TBD — add a short description of what BabyBerk serves.',
+        instagram: null,
+        website: null,
+      },
+      {
+        name: 'BabyBerk2',
+        lat: null,
+        lon: null,
+        noLocation: true,
+        blurb: 'TBD — add a short description of what BabyBerk2 serves.',
+        instagram: null,
+        website: null,
+      },
     ],
   },
 ];
@@ -114,6 +133,11 @@ export const ALL_VENUES = DINING_GROUPS.flatMap((g) =>
 
 export function venuesInGroup(groupId) {
   return DINING_GROUPS.find((g) => g.id === groupId)?.venues.map((v) => v.name) || [];
+}
+
+/** Like venuesInGroup, but returns the full catalogue entries rather than just names. */
+export function venueEntriesInGroup(groupId) {
+  return DINING_GROUPS.find((g) => g.id === groupId)?.venues || [];
 }
 
 /** Look up the catalogue entry for a live venue name from the dining site. */

@@ -24,8 +24,10 @@ import {
   hasNoFixedLocation,
   mapLinks,
   normalise,
-  venuesInGroup,
+  venueEntriesInGroup,
 } from '../lib/diningCatalog.js';
+import { preferredMapUrl } from '../lib/platform.js';
+import { statusLine } from '../lib/diningStatus.js';
 
 export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange }) {
   const { data, error, loading, refresh } = useAsync(getDiningOverview);
@@ -168,9 +170,11 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
                 trailing={<StatusPill state={hall.status.state} />}
               >
                 <div className="text-[17px] leading-[22px] text-label">{hall.name}</div>
-                <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                  {hall.status.hoursText || 'Hours unavailable'}
-                </div>
+                {statusLine(hall.status) && (
+                  <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
+                    {statusLine(hall.status)}
+                  </div>
+                )}
               </Row>
             ))}
           </ListGroup>
@@ -187,9 +191,11 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
                     trailing={<StatusPill state={venue.status.state} />}
                   >
                     <div className="text-[17px] leading-[22px] text-label">{venue.name}</div>
-                    <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                      {venue.hoursText || 'Hours unavailable'}
-                    </div>
+                    {statusLine(venue.status) && (
+                      <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
+                        {statusLine(venue.status)}
+                      </div>
+                    )}
                   </Row>
                 ))}
               </ListGroup>
@@ -198,14 +204,42 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
 
           <SectionHeader>Food Trucks</SectionHeader>
           <ListGroup>
-            {venuesInGroup('foodtrucks').map((name, i, arr) => (
+            {venueEntriesInGroup('foodtrucks').map((truck, i, arr) => (
               <Row
-                key={name}
+                key={truck.name}
                 last={i === arr.length - 1}
-                onClick={() => setDetailTarget({ type: 'retail', venue: { name } })}
+                onClick={() => setDetailTarget({ type: 'retail', venue: { name: truck.name } })}
               >
-                <div className="text-[17px] leading-[22px] text-label">{name}</div>
-                <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">{FOOD_TRUCK_NOTE}</div>
+                <div className="text-[17px] leading-[22px] text-label">{truck.name}</div>
+                <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
+                  {truck.blurb || FOOD_TRUCK_NOTE}
+                </div>
+                {(truck.instagram || truck.website) && (
+                  <div className="mt-1.5 flex gap-3">
+                    {truck.instagram && (
+                      <a
+                        href={truck.instagram}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[13px] font-medium text-ios-blue"
+                      >
+                        Instagram
+                      </a>
+                    )}
+                    {truck.website && (
+                      <a
+                        href={truck.website}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[13px] font-medium text-ios-blue"
+                      >
+                        Website
+                      </a>
+                    )}
+                  </div>
+                )}
               </Row>
             ))}
           </ListGroup>
@@ -346,8 +380,8 @@ function VenueDetail({ target }) {
           ) : venue?.status ? (
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill state={venue.status.state} />
-              {(venue.hoursText || venue.status.hoursText) && (
-                <span className="text-[14px] text-label-2">{venue.hoursText || venue.status.hoursText}</span>
+              {statusLine(venue.status) && (
+                <span className="text-[14px] text-label-2">{statusLine(venue.status)}</span>
               )}
             </div>
           ) : null}
@@ -371,22 +405,14 @@ function VenueDetail({ target }) {
       {links && (
         <>
           <SectionHeader>Location</SectionHeader>
-          <div className="flex gap-2 px-4 pb-2">
+          <div className="px-4 pb-2">
             <a
-              href={links.apple}
+              href={preferredMapUrl(links)}
               target="_blank"
               rel="noreferrer"
-              className="ios-press-scale flex-1 rounded-[12px] bg-fill px-3 py-[10px] text-center text-[14px] font-medium text-ios-blue"
+              className="ios-press-scale block rounded-[12px] bg-fill px-4 py-[10px] text-center text-[14px] font-medium text-ios-blue"
             >
-              Open in Apple Maps
-            </a>
-            <a
-              href={links.google}
-              target="_blank"
-              rel="noreferrer"
-              className="ios-press-scale flex-1 rounded-[12px] bg-fill px-3 py-[10px] text-center text-[14px] font-medium text-ios-blue"
-            >
-              Open in Google Maps
+              Directions
             </a>
           </div>
         </>
@@ -498,8 +524,7 @@ function VenueMapSummary({ target }) {
   const name = isHall ? hall?.name : venue?.name;
 
   const noLocation = hasNoFixedLocation(name);
-  const state = isHall ? hall?.status?.state : venue?.status?.state;
-  const hoursText = isHall ? hall?.status?.hoursText : venue?.hoursText || venue?.status?.hoursText;
+  const status = isHall ? hall?.status : venue?.status;
   const links = name && !noLocation ? mapLinks({ name }) : null;
 
   return (
@@ -509,10 +534,10 @@ function VenueMapSummary({ target }) {
           <p className="text-[14px] leading-[19px] text-label-2">{FOOD_TRUCK_NOTE}</p>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <StatusPill state={state || 'unknown'} />
-            <span className="text-[14px] text-label-2">
-              {state === 'closed' ? 'Closed today' : hoursText || 'Hours unavailable'}
-            </span>
+            <StatusPill state={status?.state || 'unknown'} />
+            {statusLine(status) && (
+              <span className="text-[14px] text-label-2">{statusLine(status)}</span>
+            )}
           </div>
         )}
       </div>
@@ -520,22 +545,14 @@ function VenueMapSummary({ target }) {
       {links && (
         <>
           <SectionHeader>Location</SectionHeader>
-          <div className="flex gap-2 px-4 pb-2">
+          <div className="px-4 pb-2">
             <a
-              href={links.apple}
+              href={preferredMapUrl(links)}
               target="_blank"
               rel="noreferrer"
-              className="ios-press-scale flex-1 rounded-[12px] bg-fill px-3 py-[10px] text-center text-[14px] font-medium text-ios-blue"
+              className="ios-press-scale block rounded-[12px] bg-fill px-4 py-[10px] text-center text-[14px] font-medium text-ios-blue"
             >
-              Open in Apple Maps
-            </a>
-            <a
-              href={links.google}
-              target="_blank"
-              rel="noreferrer"
-              className="ios-press-scale flex-1 rounded-[12px] bg-fill px-3 py-[10px] text-center text-[14px] font-medium text-ios-blue"
-            >
-              Open in Google Maps
+              Directions
             </a>
           </div>
         </>

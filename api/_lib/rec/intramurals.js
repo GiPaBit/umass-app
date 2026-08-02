@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { firstSentences } from '../html.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
@@ -18,7 +19,7 @@ export async function getIntramurals() {
   const failures = [];
   let sections = [];
   try {
-    const html = await fetchText(`${REC_BASE}${REC_PAGES.intramurals}`);
+    const html = await getOrFetch('rec:intramurals', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.intramurals}`));
     sections = parseRecSections(html);
   } catch (err) {
     failures.push({ what: 'Intramurals', error: String(err.message || err) });

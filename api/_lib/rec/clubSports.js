@@ -1,4 +1,5 @@
 import { fetchJson } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 
 const ENGAGE_API = 'https://umassamherst.campuslabs.com/engage/api/discovery/search/organizations';
 const ENGAGE_ORG_BASE = 'https://umassamherst.campuslabs.com/engage/organization';
@@ -19,7 +20,7 @@ export async function getClubSports() {
   let clubs = [];
   try {
     const url = `${ENGAGE_API}?top=200&query=${encodeURIComponent('club sport')}`;
-    const data = await fetchJson(url);
+    const data = await getOrFetch('rec:clubsports', TTL.RARE, () => fetchJson(url));
     const raw = data?.value || [];
     clubs = raw
       .filter(

@@ -8,36 +8,36 @@
    actually uses, so adding a theme never means duplicating the light/dark logic.
    =========================================================================== */
 
-/* --- Default: Apple's system palette -------------------------------------- */
+/* --- UMass: maroon and cream, the app's own brand identity ---------------- */
 :root,
 :root[data-theme='default'] {
-  --l-bg: #f2f2f7;
+  --l-bg: #faf1f1;
   --l-elevated: #ffffff;
   --l-card: #ffffff;
-  --l-card-alt: #f2f2f7;
-  --l-separator: rgba(60, 60, 67, 0.29);
-  --l-fill: rgba(120, 120, 128, 0.12);
-  --l-fill-strong: rgba(120, 120, 128, 0.2);
-  --l-label: #000000;
-  --l-label-2: rgba(60, 60, 67, 0.6);
-  --l-label-3: rgba(60, 60, 67, 0.3);
-  --l-accent: #007aff;
-  --l-accent-2: #5856d6;
-  --l-chrome: rgba(249, 249, 249, 0.82);
+  --l-card-alt: #f3e0e2;
+  --l-separator: rgba(122, 30, 48, 0.2);
+  --l-fill: rgba(160, 22, 42, 0.09);
+  --l-fill-strong: rgba(160, 22, 42, 0.18);
+  --l-label: #2c1013;
+  --l-label-2: rgba(44, 16, 19, 0.62);
+  --l-label-3: rgba(44, 16, 19, 0.32);
+  --l-accent: #a0162a;
+  --l-accent-2: #b5485f;
+  --l-chrome: rgba(250, 241, 241, 0.84);
 
-  --d-bg: #000000;
-  --d-elevated: #1c1c1e;
-  --d-card: #1c1c1e;
-  --d-card-alt: #2c2c2e;
-  --d-separator: rgba(84, 84, 88, 0.6);
-  --d-fill: rgba(120, 120, 128, 0.24);
-  --d-fill-strong: rgba(120, 120, 128, 0.36);
-  --d-label: #ffffff;
-  --d-label-2: rgba(235, 235, 245, 0.6);
-  --d-label-3: rgba(235, 235, 245, 0.3);
-  --d-accent: #0a84ff;
-  --d-accent-2: #5e5ce6;
-  --d-chrome: rgba(30, 30, 32, 0.8);
+  --d-bg: #14100f;
+  --d-elevated: #1c1613;
+  --d-card: #1c1613;
+  --d-card-alt: #291f1a;
+  --d-separator: rgba(255, 197, 205, 0.22);
+  --d-fill: rgba(255, 197, 205, 0.14);
+  --d-fill-strong: rgba(255, 197, 205, 0.24);
+  --d-label: #fbf4f0;
+  --d-label-2: rgba(251, 244, 240, 0.66);
+  --d-label-3: rgba(251, 244, 240, 0.34);
+  --d-accent: #e0405a;
+  --d-accent-2: #eab1b5;
+  --d-chrome: rgba(28, 20, 17, 0.84);
 }
 
 /* --- Ocean: deep blues and teals ------------------------------------------ */
@@ -164,7 +164,7 @@
   --d-chrome: rgba(16, 8, 24, 0.84);
 }
 
-/* --- Cherry Blossom: pale sakura pink, warm bark, soft leaf --------------- */
+/* --- Blossom: pale sakura pink, warm bark, soft leaf ---------------------- */
 :root[data-theme='blossom'] {
   --l-bg: #fdf3f5;
   --l-elevated: #ffffff;

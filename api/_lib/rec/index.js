@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 import { buildFacilities, buildNotices } from './hours.js';
 import { getFitness } from './fitness.js';
@@ -30,7 +31,7 @@ export async function getRecData() {
   let facilities = [];
   let notices = [];
   try {
-    const html = await fetchText(`${REC_BASE}${REC_PAGES.hours}`);
+    const html = await getOrFetch('rec:hours', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.hours}`));
     const hourSections = parseRecSections(html);
     facilities = buildFacilities(hourSections);
     const rawNoticeLines = hourSections

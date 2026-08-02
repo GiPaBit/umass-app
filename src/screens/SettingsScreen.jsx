@@ -42,7 +42,7 @@ export function SettingsScreen({ open, onClose }) {
   const profile = getProfile();
   const feedCount = listFeeds().length;
   const appearance = getAppearance();
-  const themeName = THEMES.find((t) => t.id === appearance.theme)?.name || 'Classic';
+  const themeName = THEMES.find((t) => t.id === appearance.theme)?.name || 'UMass';
   const kb = (usageBytes() / 1024).toFixed(1);
 
   return (
@@ -73,6 +73,11 @@ export function SettingsScreen({ open, onClose }) {
               title="Local Data"
               subtitle={`${Object.keys(done).length} completed · ${quickEvents.length} quick-added · ${kb} KB`}
               onClick={() => setPage('local-data')}
+            />
+            <Row
+              title="Feedback"
+              subtitle="Report a bug or suggest something"
+              onClick={() => setPage('feedback')}
               last
             />
           </ListGroup>
@@ -148,6 +153,10 @@ export function SettingsScreen({ open, onClose }) {
             setConfirmClear(false);
           }}
         />
+      </Sheet>
+
+      <Sheet open={page === 'feedback'} onClose={() => setPage(null)} title="Feedback">
+        <FeedbackPage onSent={() => setPage(null)} />
       </Sheet>
     </>
   );
@@ -254,6 +263,59 @@ function AppearancePage() {
           </Row>
         ))}
       </ListGroup>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+const FEEDBACK_CATEGORIES = [
+  { value: 'bug', label: 'Bug' },
+  { value: 'recommendation', label: 'Recommendation' },
+  { value: 'other', label: 'Other' },
+];
+const FEEDBACK_EMAIL = 'pabitteker@gmail.com';
+
+/** Builds a pre-filled mailto: link rather than sending anything itself — no backend, no dependencies. */
+function FeedbackPage({ onSent }) {
+  const [category, setCategory] = useState('bug');
+  const [message, setMessage] = useState('');
+
+  const send = () => {
+    const label = FEEDBACK_CATEGORIES.find((c) => c.value === category)?.label || category;
+    const subject = encodeURIComponent(`UMass App Feedback: ${label}`);
+    const body = encodeURIComponent(message.trim());
+    window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
+    onSent?.();
+  };
+
+  return (
+    <div className="pb-10">
+      <SectionHeader>Category</SectionHeader>
+      <div className="px-4">
+        <SegmentedControl options={FEEDBACK_CATEGORIES} value={category} onChange={setCategory} />
+      </div>
+
+      <SectionHeader>Message</SectionHeader>
+      <div className="px-4">
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="What's going on?"
+          rows={6}
+          className="w-full rounded-[14px] bg-card p-3 text-[15px] leading-[20px] text-label placeholder:text-label-3 focus:outline-none"
+        />
+      </div>
+
+      <div className="px-4 pt-4">
+        <Button variant="filled" className="w-full" onClick={send} disabled={!message.trim()}>
+          Send Feedback
+        </Button>
+      </div>
+      <p className="px-5 pt-3 text-[12px] leading-[16px] text-label-3">
+        Opens your mail app with this pre-filled, addressed to the developer. Nothing is sent from
+        within the app.
+      </p>
     </div>
   );
 }

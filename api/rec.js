@@ -8,5 +8,5 @@ import { getRecData } from './_lib/rec/index.js';
  */
 export default handleErrors(async (req, res) => {
   const data = await getRecData();
-  sendJson(res, data);
+  sendJson(res, data, { cacheSeconds: 3600 });
 }, 'UMass RecWell');

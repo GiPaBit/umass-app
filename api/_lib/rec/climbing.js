@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { firstSentences } from '../html.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
@@ -23,7 +24,7 @@ export async function getClimbing() {
   const failures = [];
   let sections = [];
   try {
-    const html = await fetchText(`${REC_BASE}${REC_PAGES.climbing}`);
+    const html = await getOrFetch('rec:climbing', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.climbing}`));
     sections = parseRecSections(html);
   } catch (err) {
     failures.push({ what: 'Climbing', error: String(err.message || err) });

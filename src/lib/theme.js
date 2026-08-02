@@ -2,12 +2,12 @@ import { KEYS, read, write } from './storage.js';
 
 /** Colour themes. Each supplies its own light and dark halves (see index.css). */
 export const THEMES = [
-  { id: 'default', name: 'Classic', swatch: ['#007aff', '#f2f2f7', '#1c1c1e'] },
+  { id: 'default', name: 'UMass', swatch: ['#a0162a', '#14100f', '#fbf4f0'] },
   { id: 'ocean', name: 'Ocean', swatch: ['#0b72c4', '#00a0b0', '#04121f'] },
   { id: 'dunes', name: 'Dunes', swatch: ['#c2701b', '#f0a13c', '#3b2408'] },
   { id: 'forest', name: 'Forest', swatch: ['#217a45', '#9ad14e', '#06120b'] },
   { id: 'wildflowers', name: 'Wildflowers', swatch: ['#8b3fd4', '#ff6b9d', '#f7b733'] },
-  { id: 'blossom', name: 'Cherry Blossom', swatch: ['#d1567c', '#ffc5d5', '#8a9e7c'] },
+  { id: 'blossom', name: 'Blossom', swatch: ['#d1567c', '#ffc5d5', '#8a9e7c'] },
 ];
 
 /** Themes that were renamed after release — keeps a saved preference working. */

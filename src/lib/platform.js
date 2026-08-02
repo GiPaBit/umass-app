@@ -34,6 +34,17 @@ export function initPlatformDetection() {
   window.addEventListener('orientationchange', apply);
 }
 
+/** Broader than isIOS() — also covers Macs, since Apple Maps links are the right choice there too. */
+export function isApplePlatform() {
+  if (typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
+}
+
+/** Pick the single best "open in maps" URL for this platform from a {apple, google} pair. */
+export function preferredMapUrl({ apple, google }) {
+  return isApplePlatform() ? apple : google;
+}
+
 /** iOS has no `beforeinstallprompt`; Safari's Share-sheet "Add to Home Screen" is manual only. */
 export function isIOS() {
   if (typeof navigator === 'undefined') return false;

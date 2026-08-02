@@ -1,4 +1,5 @@
 import { fetchText } from '../http.js';
+import { getOrFetch, TTL } from '../cache.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
 
 const POOL_MAP_QUERY = {
@@ -17,7 +18,7 @@ export async function getAquatics({ facilities, notices }) {
   const failures = [];
   let sections = [];
   try {
-    const html = await fetchText(`${REC_BASE}${REC_PAGES.aquatics}`);
+    const html = await getOrFetch('rec:aquatics', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.aquatics}`));
     sections = parseRecSections(html);
   } catch (err) {
     failures.push({ what: 'Aquatics', error: String(err.message || err) });

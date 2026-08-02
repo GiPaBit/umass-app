@@ -14,13 +14,17 @@ export default handleErrors(async (req, res) => {
 
   const { events, failures, sources } = await fetchAllEvents({ days });
 
-  sendJson(res, {
-    ok: true,
-    days,
-    count: events.length,
-    events,
-    failures,
-    sources,
-    fetchedAt: new Date().toISOString(),
-  });
+  sendJson(
+    res,
+    {
+      ok: true,
+      days,
+      count: events.length,
+      events,
+      failures,
+      sources,
+      fetchedAt: new Date().toISOString(),
+    },
+    { cacheSeconds: 1200 },
+  );
 }, 'UMass Events');

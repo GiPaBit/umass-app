@@ -14,7 +14,11 @@ import { shortDateLabel, todayKey } from '../../lib/dates.js';
 export function FitnessTab({ data }) {
   const fitness = data.recwell.fitness;
   const weeks = fitness.weeks || [];
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => {
+    const key = todayKey();
+    const found = weeks.findIndex((w) => (w.days || []).some((d) => d.date === key));
+    return found === -1 ? 0 : found;
+  });
   const [showPast, setShowPast] = useState(false);
   const week = weeks[index];
   const today = todayKey();

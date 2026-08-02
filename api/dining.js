@@ -1,9 +1,11 @@
 import { fetchText, handleErrors, sendJson } from './_lib/http.js';
+import { getOrFetch, TTL } from './_lib/cache.js';
 import {
   DINING_BASE,
   HALLS,
   RETAIL_CATEGORIES,
   classifyHours,
+  opensLabel,
   parseLocationHours,
   parseMenuPage,
   parseRetailListing,
@@ -19,8 +21,8 @@ export default handleErrors(async (req, res) => {
   const query = req.query || Object.fromEntries(new URL(req.url, 'http://x').searchParams);
   const hall = query.hall;
 
-  if (hall) return sendJson(res, await getHallMenu(hall));
-  return sendJson(res, await getOverview());
+  if (hall) return sendJson(res, await getHallMenu(hall), { cacheSeconds: 3600 });
+  return sendJson(res, await getOverview(), { cacheSeconds: 3600 });
 }, 'UMass Dining');
 
 async function getHallMenu(slug) {
@@ -28,8 +30,12 @@ async function getHallMenu(slug) {
   if (!hall) throw new Error(`Unknown dining hall "${slug}"`);
 
   const [menuHtml, locationHtml] = await Promise.all([
-    fetchText(`${DINING_BASE}/locations-menus/${hall.slug}/menu`),
-    fetchText(`${DINING_BASE}/locations-menus/${hall.slug}`),
+    getOrFetch(`dining:menu:${hall.slug}`, TTL.DAILY, () =>
+      fetchText(`${DINING_BASE}/locations-menus/${hall.slug}/menu`),
+    ),
+    getOrFetch(`dining:hours:${hall.slug}`, TTL.RARE, () =>
+      fetchText(`${DINING_BASE}/locations-menus/${hall.slug}`),
+    ),
   ]);
 
   const menu = parseMenuPage(menuHtml);
@@ -48,7 +54,9 @@ async function getHallMenu(slug) {
 async function getOverview() {
   const hallResults = await Promise.allSettled(
     HALLS.map(async (hall) => {
-      const html = await fetchText(`${DINING_BASE}/locations-menus/${hall.slug}`);
+      const html = await getOrFetch(`dining:hours:${hall.slug}`, TTL.RARE, () =>
+        fetchText(`${DINING_BASE}/locations-menus/${hall.slug}`),
+      );
       const hoursSections = parseLocationHours(html);
       return {
         ...hall,
@@ -62,7 +70,9 @@ async function getOverview() {
 
   const retailResults = await Promise.allSettled(
     RETAIL_CATEGORIES.map(async (cat) => {
-      const html = await fetchText(`${DINING_BASE}/locations-menus/${cat.slug}`);
+      const html = await getOrFetch(`dining:retail:${cat.slug}`, TTL.DAILY, () =>
+        fetchText(`${DINING_BASE}/locations-menus/${cat.slug}`),
+      );
       return { ...cat, venues: parseRetailListing(html, cat.slug) };
     }),
   );
@@ -90,7 +100,9 @@ function statusFromSections(sections) {
     for (const line of section.lines) {
       if (line.kind !== 'hours') continue;
       const status = classifyHours(line.text);
-      if (status.state !== 'unknown') return { ...status, from: section.title, hoursText: line.text };
+      if (status.state !== 'unknown') {
+        return { ...status, from: section.title, hoursText: line.text, opensLabel: opensLabel(status) };
+      }
     }
   }
   return { state: 'unknown', ranges: [] };

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Button } from '../components/ui.jsx';
 import { DiningPicker } from '../components/DiningPicker.jsx';
 import { WorkoutPreferencePicker } from '../components/WorkoutPreferencePicker.jsx';
-import { SPORT_CHOICES, getProfile, setProfile } from '../lib/profile.js';
+import { NameField } from '../components/NameField.jsx';
+import { SportsPicker } from '../components/SportsPicker.jsx';
+import { getProfile, setProfile } from '../lib/profile.js';
 
 /**
  * The interests questionnaire. Used twice: full-screen on first launch, and
@@ -23,25 +25,11 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
 
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
-  const toggleSport = (sport) =>
-    set({
-      sports: draft.sports.includes(sport)
-        ? draft.sports.filter((s) => s !== sport)
-        : [...draft.sports, sport],
-    });
-
   const steps = [
     {
       title: 'Hey there',
       caption: 'What should the app call you? This shows up in your daily brief.',
-      body: (
-        <input
-          value={draft.name}
-          onChange={(e) => set({ name: e.target.value })}
-          placeholder="Your name"
-          className="w-full rounded-[14px] bg-card px-4 py-3.5 text-[17px] text-label placeholder:text-label-3 focus:outline-none"
-        />
-      ),
+      body: <NameField value={draft.name} onChange={(name) => set({ name })} />,
     },
     {
       title: 'Where do you eat?',
@@ -67,7 +55,7 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
     {
       title: 'Which teams do you follow?',
       caption: 'Games for these get called out ahead of everything else.',
-      body: <Chips options={SPORT_CHOICES} selected={draft.sports} onToggle={toggleSport} />,
+      body: <SportsPicker selected={draft.sports} onChange={(sports) => set({ sports })} />,
     },
   ];
 
@@ -135,28 +123,6 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-export function Chips({ options, selected, onToggle }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => {
-        const on = selected.includes(option);
-        return (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onToggle(option)}
-            className={`ios-press-scale rounded-full px-4 py-[9px] text-[15px] font-medium transition-colors ${
-              on ? 'bg-ios-blue text-white' : 'bg-card text-label'
-            }`}
-          >
-            {option}
-          </button>
-        );
-      })}
     </div>
   );
 }

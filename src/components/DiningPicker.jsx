@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronIcon } from './Icons.jsx';
 import { DINING_GROUPS } from '../lib/diningCatalog.js';
 
@@ -9,9 +9,21 @@ import { DINING_GROUPS } from '../lib/diningCatalog.js';
  * halls that means "all of them" — the umbrella is the thing you actually care
  * about. Cafés and Grab 'n Go are scattered, so their header only expands, and
  * you choose individually. Either way the group can be opened to fine-tune.
+ *
+ * Food trucks are excluded — no fixed location, so nothing to "favorite" —
+ * and stay pinnable only from the dining list's own map/hours view.
  */
 export function DiningPicker({ selected, onChange }) {
   const [open, setOpen] = useState(() => new Set());
+
+  const groups = useMemo(
+    () =>
+      DINING_GROUPS.filter((g) => g.id !== 'foodtrucks').map((g) => ({
+        ...g,
+        venues: [...g.venues].sort((a, b) => a.name.localeCompare(b.name)),
+      })),
+    [],
+  );
 
   const toggleOpen = (id) =>
     setOpen((prev) => {
@@ -40,7 +52,7 @@ export function DiningPicker({ selected, onChange }) {
 
   return (
     <div className="space-y-2.5">
-      {DINING_GROUPS.map((group) => {
+      {groups.map((group) => {
         const names = group.venues.map((v) => v.name);
         const chosen = names.filter((n) => selected.includes(n));
         const all = chosen.length === names.length;

@@ -139,3 +139,14 @@ export function SearchIcon(p) {
     </svg>
   );
 }
+
+export function StarIcon({ filled, ...p }) {
+  return (
+    <svg {...base} width={22} height={22} strokeWidth={1.8} strokeLinejoin="round" {...p}>
+      <path
+        d="M12 3.4l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7Z"
+        fill={filled ? 'currentColor' : 'none'}
+      />
+    </svg>
+  );
+}

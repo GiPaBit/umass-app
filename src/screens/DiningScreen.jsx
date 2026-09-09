@@ -14,13 +14,15 @@ import {
   StaleNotice,
   StatusPill,
 } from '../components/ui.jsx';
-import { ChevronIcon } from '../components/Icons.jsx';
+import { ChevronIcon, StarIcon } from '../components/Icons.jsx';
 import { getDiningOverview, getHallMenu } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
+import { useLocalState } from '../hooks/useLocalState.js';
 import { CampusMap } from '../components/CampusMap.jsx';
 import {
   ALL_VENUES,
   FOOD_TRUCK_NOTE,
+  findVenue,
   hasNoFixedLocation,
   mapLinks,
   normalise,
@@ -28,12 +30,32 @@ import {
 } from '../lib/diningCatalog.js';
 import { preferredMapUrl } from '../lib/platform.js';
 import { statusLine } from '../lib/diningStatus.js';
+import { KEYS } from '../lib/storage.js';
+import { getProfile, matchesName, setProfile } from '../lib/profile.js';
 
 export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange }) {
   const { data, error, loading, refresh } = useAsync(getDiningOverview);
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
+
+  // Re-renders whenever the profile changes (e.g. pinning from Settings'
+  // Favorite Dining picker) so this list's stars stay in sync both ways.
+  useLocalState(KEYS.profile, null);
+  const diningFavourites = getProfile().diningFavourites || [];
+  const isPinned = (name) => matchesName(name, diningFavourites);
+  const togglePin = (name) => {
+    // Store the catalogue's canonical name (e.g. "Worcester Commons"), not
+    // whatever short form the live site uses ("Worcester") — DiningPicker's
+    // checkboxes match against the catalogue exactly, so the two views would
+    // otherwise disagree about what's pinned.
+    const canonical = findVenue(name)?.name || name;
+    setProfile({
+      diningFavourites: isPinned(name)
+        ? diningFavourites.filter((f) => !matchesName(name, [f]))
+        : [...diningFavourites, canonical],
+    });
+  };
 
   useEffect(() => {
     onMapModeChange?.(view === 'map');
@@ -90,6 +112,19 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
     return halls + venues;
   }, [data]);
 
+  // Pinned halls/venues move to their own section at the top, out of their
+  // normal one — food trucks have no fixed location and aren't pinnable.
+  const unpinnedHalls = data ? data.halls.filter((h) => !isPinned(h.name)) : [];
+  const pinnedItems = data
+    ? [
+        ...data.halls.filter((h) => isPinned(h.name)).map((hall) => ({ type: 'hall', hall })),
+        ...data.categories
+          .flatMap((c) => c.venues)
+          .filter((v) => isPinned(v.name))
+          .map((venue) => ({ type: 'retail', venue })),
+      ]
+    : [];
+
   if (data && view === 'map') {
     return (
       <div className="relative h-full w-full overflow-hidden bg-bg">
@@ -98,7 +133,16 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
             venues={ALL_VENUES}
             statusOf={statusOf}
             selectedPinId={selectedPin?.id}
-            onSelectPin={setSelectedPin}
+            onSelectPin={(pin) => {
+              // A pin with exactly one venue has nothing to disambiguate —
+              // skip straight to its full detail sheet instead of the
+              // accordion-of-venues popup.
+              if (pin && pin.venues.length === 1) {
+                setDetailTarget(resolveTarget(pin.venues[0].name));
+              } else {
+                setSelectedPin(pin);
+              }
+            }}
           />
         </div>
 
@@ -130,6 +174,8 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
           resolveTarget={resolveTarget}
           onClose={() => setSelectedPin(null)}
         />
+
+        <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} />
       </div>
     );
   }
@@ -160,47 +206,68 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
           <StaleNotice data={data} />
           <FailureNotice failures={data.failures} />
 
-          <SectionHeader>Dining Commons</SectionHeader>
-          <ListGroup>
-            {data.halls.map((hall, i) => (
-              <Row
-                key={hall.slug}
-                last={i === data.halls.length - 1}
-                onClick={() => setDetailTarget({ type: 'hall', hall })}
-                trailing={<StatusPill state={hall.status.state} />}
-              >
-                <div className="text-[17px] leading-[22px] text-label">{hall.name}</div>
-                {statusLine(hall.status) && (
-                  <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                    {statusLine(hall.status)}
-                  </div>
-                )}
-              </Row>
-            ))}
-          </ListGroup>
-
-          {data.categories.map((cat) => (
-            <div key={cat.slug}>
-              <SectionHeader>{cat.name}</SectionHeader>
+          {pinnedItems.length > 0 && (
+            <>
+              <SectionHeader>Pinned</SectionHeader>
               <ListGroup>
-                {cat.venues.map((venue, i) => (
-                  <Row
-                    key={`${venue.name}-${i}`}
-                    last={i === cat.venues.length - 1}
-                    onClick={() => setDetailTarget({ type: 'retail', venue })}
-                    trailing={<StatusPill state={venue.status.state} />}
-                  >
-                    <div className="text-[17px] leading-[22px] text-label">{venue.name}</div>
-                    {statusLine(venue.status) && (
-                      <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                        {statusLine(venue.status)}
-                      </div>
-                    )}
-                  </Row>
+                {pinnedItems.map((item, i) => (
+                  <PinnableRow
+                    key={item.type === 'hall' ? item.hall.slug : `${item.venue.name}-${i}`}
+                    name={item.type === 'hall' ? item.hall.name : item.venue.name}
+                    status={item.type === 'hall' ? item.hall.status : item.venue.status}
+                    last={i === pinnedItems.length - 1}
+                    pinned
+                    onTogglePin={() =>
+                      togglePin(item.type === 'hall' ? item.hall.name : item.venue.name)
+                    }
+                    onClick={() => setDetailTarget(item)}
+                  />
                 ))}
               </ListGroup>
-            </div>
-          ))}
+            </>
+          )}
+
+          {unpinnedHalls.length > 0 && (
+            <>
+              <SectionHeader>Dining Commons</SectionHeader>
+              <ListGroup>
+                {unpinnedHalls.map((hall, i) => (
+                  <PinnableRow
+                    key={hall.slug}
+                    name={hall.name}
+                    status={hall.status}
+                    last={i === unpinnedHalls.length - 1}
+                    pinned={false}
+                    onTogglePin={() => togglePin(hall.name)}
+                    onClick={() => setDetailTarget({ type: 'hall', hall })}
+                  />
+                ))}
+              </ListGroup>
+            </>
+          )}
+
+          {data.categories.map((cat) => {
+            const venues = cat.venues.filter((venue) => !isPinned(venue.name));
+            if (venues.length === 0) return null;
+            return (
+              <div key={cat.slug}>
+                <SectionHeader>{cat.name}</SectionHeader>
+                <ListGroup>
+                  {venues.map((venue, i) => (
+                    <PinnableRow
+                      key={`${venue.name}-${i}`}
+                      name={venue.name}
+                      status={venue.status}
+                      last={i === venues.length - 1}
+                      pinned={false}
+                      onTogglePin={() => togglePin(venue.name)}
+                      onClick={() => setDetailTarget({ type: 'retail', venue })}
+                    />
+                  ))}
+                </ListGroup>
+              </div>
+            );
+          })}
 
           <SectionHeader>Food Trucks</SectionHeader>
           <ListGroup>
@@ -252,6 +319,44 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
 
       <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} />
     </Screen>
+  );
+}
+
+/**
+ * A dining-list row with a leading pin/star toggle, synced with
+ * `profile.diningFavourites`. Built from two sibling buttons rather than
+ * `Row`'s usual single clickable element — nesting the star button inside
+ * Row's own `<button>` is invalid HTML and breaks click handling in some
+ * browsers.
+ */
+function PinnableRow({ name, status, last, pinned, onTogglePin, onClick }) {
+  return (
+    <div
+      className={`relative flex w-full items-center ${last ? '' : 'ios-separator'}`}
+      style={{ '--sep-inset': '16px' }}
+    >
+      <button
+        type="button"
+        onClick={onTogglePin}
+        aria-label={pinned ? `Unpin ${name}` : `Pin ${name}`}
+        className="ios-press-scale shrink-0 py-[11px] pl-4 pr-2"
+      >
+        <StarIcon filled={pinned} width={20} height={20} className={pinned ? 'text-ios-yellow' : 'text-label-3'} />
+      </button>
+      <button
+        type="button"
+        onClick={onClick}
+        className="ios-press flex min-w-0 flex-1 items-center gap-3 py-[11px] pr-4 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[17px] leading-[22px] text-label">{name}</div>
+          {statusLine(status) && (
+            <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">{statusLine(status)}</div>
+          )}
+        </div>
+        <StatusPill state={status.state} />
+      </button>
+    </div>
   );
 }
 

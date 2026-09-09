@@ -1,5 +1,6 @@
 import { dateKey, isToday, timeLabel, todayKey, shiftKey, dayLabelFromKey } from './dates.js';
 import { matchesName, matchesSports, workoutFacilityMatch } from './profile.js';
+import { venuesInGroup } from './diningCatalog.js';
 
 /**
  * Builds the two Today-tab briefs as arrays of segments:
@@ -29,6 +30,12 @@ function plural(n, one, many) {
 function whenPhrase(key) {
   const label = dayLabelFromKey(key);
   return /^(Today|Tomorrow|Yesterday)$/.test(label) ? label.toLowerCase() : `on ${label}`;
+}
+
+/** Breakfast / lunch / dinner from the wall clock — mirrors DiningScreen's defaultMeal(). */
+function currentMealLabel() {
+  const hour = new Date().getHours();
+  return hour < 10.5 ? 'breakfast' : hour < 16 ? 'lunch' : 'dinner';
 }
 
 /** Join a list into "a, b and c". */
@@ -131,6 +138,21 @@ function composeDining(dining, profile) {
   );
 
   if (openFavourites.length) {
+    // Every dining-commons hall picked as a favourite, and all of them open
+    // right now — naming all four individually is just noise at that point.
+    const allHallNames = venuesInGroup('halls');
+    const allHallsFavourited =
+      allHallNames.length > 0 && allHallNames.every((name) => matchesName(name, favourites));
+    const openHalls = halls.filter((h) => h.status?.state === 'open');
+
+    if (allHallsFavourited && openHalls.length === allHallNames.length) {
+      return [
+        { text: ' ' },
+        { text: 'All dining halls', tab: 'dining', strong: true },
+        { text: ` are open right now, serving ${currentMealLabel()}.` },
+      ];
+    }
+
     const shown = openFavourites.slice(0, 3);
     const seg = [{ text: ' ' }];
     seg.push({ text: joinList(shown.map((p) => p.name)), tab: 'dining', strong: true });

@@ -9,13 +9,16 @@ import {
   Sheet,
   Toggle,
 } from '../components/ui.jsx';
-import { PreferencesFlow } from './PreferencesFlow.jsx';
+import { DiningPicker } from '../components/DiningPicker.jsx';
+import { WorkoutPreferencePicker } from '../components/WorkoutPreferencePicker.jsx';
+import { NameField } from '../components/NameField.jsx';
+import { SportsPicker } from '../components/SportsPicker.jsx';
 import { CalendarFeedForm } from '../components/CalendarFeedForm.jsx';
 import { useLocalState } from '../hooks/useLocalState.js';
 import { KEYS, clearAll, usageBytes } from '../lib/storage.js';
 import { FEED_KINDS, deleteFeed, listFeeds, maskUrl } from '../lib/feeds.js';
 import { FONTS, MODES, THEMES, getAppearance, setAppearance } from '../lib/theme.js';
-import { getProfile } from '../lib/profile.js';
+import { getProfile, setProfile } from '../lib/profile.js';
 import { DEFAULT_BRIEF_PREFS, setBriefPrefs } from '../lib/briefPrefs.js';
 
 /**
@@ -26,7 +29,9 @@ export function SettingsScreen({ open, onClose }) {
   const [page, setPage] = useState(null);
   const [done, setDone] = useLocalState(KEYS.doneAssignments, {});
   const [quickEvents, setQuickEvents] = useLocalState(KEYS.quickEvents, []);
-  const [profileRaw] = useLocalState(KEYS.profile, null);
+  // Re-renders Settings whenever the profile changes anywhere (e.g. pinning a
+  // dining hall from the Dining tab), so subtitles here stay current.
+  useLocalState(KEYS.profile, null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [briefPrefs] = useLocalState(KEYS.briefPrefs, DEFAULT_BRIEF_PREFS);
 
@@ -54,30 +59,45 @@ export function SettingsScreen({ open, onClose }) {
               title="Appearance"
               subtitle={`${themeName} · ${MODES.find((m) => m.id === appearance.mode)?.name}`}
               onClick={() => setPage('appearance')}
+              last
             />
+          </ListGroup>
+
+          <SectionHeader>Calendars</SectionHeader>
+          <ListGroup>
             <Row
               title="Calendars"
               subtitle={feedCount ? `${feedCount} connected` : 'Not connected'}
               onClick={() => setPage('calendars')}
+              last
             />
+          </ListGroup>
+
+          <SectionHeader>Preferences</SectionHeader>
+          <ListGroup>
+            <Row title="Name" subtitle={profile.name || 'Not set'} onClick={() => setPage('pref-name')} />
             <Row
-              title="Preferences"
+              title="Favorite Dining"
               subtitle={
-                profile.name
-                  ? `${profile.name} · ${(profile.diningFavourites || []).length} places`
-                  : 'Name, food, gym and teams'
+                (profile.diningFavourites || []).length
+                  ? `${profile.diningFavourites.length} places`
+                  : 'None selected'
               }
-              onClick={() => setPage('preferences')}
+              onClick={() => setPage('pref-dining')}
             />
             <Row
-              title="Local Data"
-              subtitle={`${Object.keys(done).length} completed · ${quickEvents.length} quick-added · ${kb} KB`}
-              onClick={() => setPage('local-data')}
+              title="Workout"
+              subtitle={
+                (profile.workoutPreferences || []).length
+                  ? `${profile.workoutPreferences.length} selected`
+                  : 'None selected'
+              }
+              onClick={() => setPage('pref-workout')}
             />
             <Row
-              title="Feedback"
-              subtitle="Report a bug or suggest something"
-              onClick={() => setPage('feedback')}
+              title="Sports"
+              subtitle={(profile.sports || []).length ? `${profile.sports.length} teams` : 'None selected'}
+              onClick={() => setPage('pref-sports')}
               last
             />
           </ListGroup>
@@ -113,6 +133,21 @@ export function SettingsScreen({ open, onClose }) {
             </Row>
           </ListGroup>
 
+          <SectionHeader>Other</SectionHeader>
+          <ListGroup>
+            <Row
+              title="Feedback"
+              subtitle="Report a bug or suggest something"
+              onClick={() => setPage('feedback')}
+            />
+            <Row
+              title="Local Data"
+              subtitle={`${Object.keys(done).length} completed · ${quickEvents.length} quick-added · ${kb} KB`}
+              onClick={() => setPage('local-data')}
+              last
+            />
+          </ListGroup>
+
           <p className="px-5 pt-6 text-center text-[12px] leading-[16px] text-label-3">
             Personal build · live from umassdining.com, umass.edu/recwell, events.umass.edu and
             umassathletics.com
@@ -128,16 +163,45 @@ export function SettingsScreen({ open, onClose }) {
         <FeedsPage />
       </Sheet>
 
-      <Sheet open={page === 'preferences'} onClose={() => setPage(null)} title="Preferences">
-        {/* Same questionnaire as first launch, pre-filled with current answers. */}
-        <div className="h-[78vh]">
-          <PreferencesFlow
-            key={String(profileRaw)}
-            onDone={() => setPage(null)}
-            onCancel={() => setPage(null)}
-          />
-        </div>
-      </Sheet>
+      <PreferenceSheet
+        open={page === 'pref-name'}
+        onClose={() => setPage(null)}
+        title="Name"
+        value={profile.name}
+        onSave={(name) => setProfile({ name: name.trim() })}
+      >
+        {(value, setValue) => <NameField value={value} onChange={setValue} />}
+      </PreferenceSheet>
+
+      <PreferenceSheet
+        open={page === 'pref-dining'}
+        onClose={() => setPage(null)}
+        title="Favorite Dining"
+        value={profile.diningFavourites || []}
+        onSave={(diningFavourites) => setProfile({ diningFavourites })}
+      >
+        {(value, setValue) => <DiningPicker selected={value} onChange={setValue} />}
+      </PreferenceSheet>
+
+      <PreferenceSheet
+        open={page === 'pref-workout'}
+        onClose={() => setPage(null)}
+        title="Workout"
+        value={profile.workoutPreferences || []}
+        onSave={(workoutPreferences) => setProfile({ workoutPreferences })}
+      >
+        {(value, setValue) => <WorkoutPreferencePicker selected={value} onChange={setValue} />}
+      </PreferenceSheet>
+
+      <PreferenceSheet
+        open={page === 'pref-sports'}
+        onClose={() => setPage(null)}
+        title="Sports"
+        value={profile.sports || []}
+        onSave={(sports) => setProfile({ sports })}
+      >
+        {(value, setValue) => <SportsPicker selected={value} onChange={setValue} />}
+      </PreferenceSheet>
 
       <Sheet open={page === 'local-data'} onClose={() => setPage(null)} title="Local Data">
         <LocalDataPage
@@ -159,6 +223,38 @@ export function SettingsScreen({ open, onClose }) {
         <FeedbackPage onSent={() => setPage(null)} />
       </Sheet>
     </>
+  );
+}
+
+/**
+ * One question, one sheet: shows a single preference picker pre-filled with
+ * the current value, only writing it back to the profile on Save so a
+ * cancel/dismiss mid-edit doesn't touch anything else.
+ */
+function PreferenceSheet({ open, onClose, title, value: initial, onSave, children }) {
+  const [value, setValue] = useState(initial);
+
+  useEffect(() => {
+    if (open) setValue(initial);
+    // Re-seed only when the sheet opens, not on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <Sheet open={open} onClose={onClose} title={title}>
+      <div className="px-4 pt-4 pb-8">
+        {children(value, setValue)}
+        <Button
+          className="mt-5 w-full"
+          onClick={() => {
+            onSave(value);
+            onClose();
+          }}
+        >
+          Save
+        </Button>
+      </div>
+    </Sheet>
   );
 }
 

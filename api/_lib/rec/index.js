@@ -1,7 +1,7 @@
 import { fetchText } from '../http.js';
 import { getOrFetch, TTL } from '../cache.js';
 import { parseRecSections, REC_BASE, REC_PAGES } from './shared.js';
-import { buildFacilities, buildNotices } from './hours.js';
+import { buildFacilities, buildNotices, parseHomepageAlert } from './hours.js';
 import { getFitness } from './fitness.js';
 import { getAquatics } from './aquatics.js';
 import { getClimbing } from './climbing.js';
@@ -44,6 +44,17 @@ export async function getRecData() {
     failures.push({ what: 'Facility hours', error: String(err.message || err) });
   }
 
+  // Supplementary, not fatal: the homepage alert banner is a nice-to-have
+  // freshness signal, so a failure here just means no banner, never a
+  // failures[] entry that'd surface as a warning for something this minor.
+  let hoursAlert = null;
+  try {
+    const homeHtml = await getOrFetch('rec:home', TTL.RARE, () => fetchText(`${REC_BASE}${REC_PAGES.home}`));
+    hoursAlert = parseHomepageAlert(homeHtml);
+  } catch {
+    // ignore
+  }
+
   const [fitnessR, aquaticsR, climbingR, nestR, intramuralR, clubSportsR] = await Promise.allSettled([
     getFitness(),
     getAquatics({ facilities, notices }),
@@ -74,7 +85,7 @@ export async function getRecData() {
     fetchedAt: new Date().toISOString(),
     failures,
     recwell: {
-      hours: { facilities },
+      hours: { facilities, url: `${REC_BASE}${REC_PAGES.hours}`, alert: hoursAlert },
       notices,
       fitness,
       aquatics,

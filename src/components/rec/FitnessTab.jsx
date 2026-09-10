@@ -35,6 +35,13 @@ export function FitnessTab({ data }) {
   const pastDays = containsToday ? days.filter((d) => d.date && d.date < today) : [];
   const restDays = containsToday ? days.filter((d) => !(d.date && d.date < today)) : days;
 
+  // "This week" only applies to the week that actually contains today — any
+  // other paged week falls back to its real date range, never a reused label.
+  const weekLabel = containsToday
+    ? 'This week'
+    : week?.label ||
+      (days.length > 0 ? `${shortDateLabel(days[0].date)} – ${shortDateLabel(days[days.length - 1].date)}` : 'Week');
+
   return (
     <>
       {fitness.primer && (
@@ -67,7 +74,7 @@ export function FitnessTab({ data }) {
             >
               <ChevronIcon width={16} height={16} style={{ transform: 'rotate(180deg)' }} />
             </button>
-            <div className="text-[15px] font-semibold text-label">{week?.label || 'This week'}</div>
+            <div className="text-[15px] font-semibold text-label">{weekLabel}</div>
             <button
               type="button"
               disabled={index === weeks.length - 1}

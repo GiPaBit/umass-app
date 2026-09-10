@@ -1,4 +1,5 @@
 import { classifyHours, nowInAmherst, parseRanges } from '../dining.js';
+import { parseRecSections } from './shared.js';
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -180,4 +181,23 @@ export function buildNotices(rawLines) {
   return rawLines
     .map((text) => ({ text, date: extractNoticeDate(text, now) }))
     .filter((n) => !n.date || new Date(n.date) >= now);
+}
+
+/**
+ * The RecWell homepage posts a hand-written "Facility Alert" heading + prose
+ * (holiday/move-in-week schedules, etc.) whenever hours genuinely deviate
+ * from the regular hours-of-operation page — confirmed live to be more
+ * current than that page during those windows. The prose names facilities
+ * loosely ("Boyden Pool", "RockWell") that don't map 1:1 onto the regular
+ * page's own headings ("Boyden" nested under "Pools" vs. "Boyden
+ * Gymnasium" as its own facility) closely enough to safely auto-merge
+ * per-facility hours without risking a wrong open/closed status — so this
+ * only extracts the banner to show verbatim and prominently, rather than
+ * attempting a structured per-facility override.
+ */
+export function parseHomepageAlert(html) {
+  const sections = parseRecSections(html);
+  const alert = sections.find((s) => /alert/i.test(s.heading));
+  if (!alert) return null;
+  return { heading: alert.heading, lines: alert.lines };
 }

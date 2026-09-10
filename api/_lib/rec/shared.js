@@ -4,6 +4,7 @@ export const REC_BASE = 'https://www.umass.edu';
 export const FUSION_BASE = 'https://recwell.umass.edu';
 
 export const REC_PAGES = {
+  home: '/recwell/',
   hours: '/recwell/facilities/hours-operation',
   intramurals: '/recwell/programs-and-services/intramural-sports',
   clubSports: '/recwell/club-sports',

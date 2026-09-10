@@ -43,7 +43,7 @@ export function DiningIcon({ filled, ...p }) {
         fill="none"
         strokeWidth={filled ? 2.4 : 1.7}
       />
-      <path d="M6.5 3.2v5.4M9 3.2v5.4" strokeWidth={filled ? 2.4 : 1.7} />
+      <path d="M9 3.2v5.4" strokeWidth={filled ? 2.4 : 1.7} />
       <path
         d="M17 3.2c-1.7 1.3-2.6 3.4-2.6 5.8 0 1.9.9 3.2 2.6 3.4v8.4"
         strokeWidth={filled ? 2.4 : 1.7}

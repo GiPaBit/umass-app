@@ -4,9 +4,30 @@ import { ListGroup, Row, SectionHeader, StatusPill } from '../ui.jsx';
 export function HoursTab({ data }) {
   const facilities = data.recwell.hours.facilities;
   const notices = data.recwell.notices;
+  const alert = data.recwell.hours.alert;
+  const hoursUrl = data.recwell.hours.url;
 
   return (
     <>
+      {alert && (
+        <div className="mx-4 mt-3 mb-1 rounded-[12px] bg-ios-orange/12 px-4 py-3">
+          <div className="text-[13px] font-semibold text-ios-orange">{alert.heading}</div>
+          {alert.lines.map((line, i) => (
+            <p key={i} className="mt-1 text-[13px] leading-[17px] text-label-2">
+              {line}
+            </p>
+          ))}
+          <a
+            href={hoursUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-block text-[13px] font-medium text-ios-blue"
+          >
+            Hours may vary — check the official page →
+          </a>
+        </div>
+      )}
+
       <SectionHeader>Today</SectionHeader>
       <ListGroup>
         {facilities.map((f, i) => (

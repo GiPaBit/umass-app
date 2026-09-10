@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import { ErrorState, FailureNotice, LoadingState, StaleNotice } from '../components/ui.jsx';
 import { RecWellSection } from '../components/rec/RecWellSection.jsx';
@@ -18,7 +19,7 @@ const SECTION_OPTIONS = [
  * same pattern App.jsx uses for the five main tabs) so switching modes doesn't
  * lose a section's own sub-tab selection or scroll position.
  */
-export function RecScreen() {
+export const RecScreen = forwardRef(function RecScreen(_props, ref) {
   const { data, error, loading, refresh } = useAsync(getRec);
   const [section, setSection] = useLocalState(KEYS.recSection, 'recwell');
 
@@ -27,6 +28,7 @@ export function RecScreen() {
 
   return (
     <Screen
+      ref={ref}
       titleMenu={{ options: SECTION_OPTIONS, value: section, onChange: setSection }}
       subtitle={data ? `${openNow} facilit${openNow === 1 ? 'y' : 'ies'} open` : undefined}
       onRefresh={refresh}
@@ -50,4 +52,4 @@ export function RecScreen() {
       )}
     </Screen>
   );
-}
+});

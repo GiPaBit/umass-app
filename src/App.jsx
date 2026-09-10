@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TabBar } from './components/TabBar.jsx';
 import { TodayScreen } from './screens/TodayScreen.jsx';
 import { AssignmentsScreen } from './screens/AssignmentsScreen.jsx';
@@ -6,6 +6,7 @@ import { DiningScreen } from './screens/DiningScreen.jsx';
 import { RecScreen } from './screens/RecScreen.jsx';
 import { EventsScreen } from './screens/EventsScreen.jsx';
 import { SettingsScreen } from './screens/SettingsScreen.jsx';
+import { CalendarSetupScreen } from './screens/CalendarSetupScreen.jsx';
 import { OnboardingScreen } from './screens/OnboardingScreen.jsx';
 import { InstallScreen } from './screens/InstallScreen.jsx';
 import { useLocalState } from './hooks/useLocalState.js';
@@ -23,6 +24,7 @@ const ALWAYS_SHOW_INSTALL_PAGE = false;
 export default function App() {
   const [tab, setTab] = useState('today');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [calendarSetupOpen, setCalendarSetupOpen] = useState(false);
   const [quickEvents] = useLocalState(KEYS.quickEvents, []);
   const [needsOnboarding, setNeedsOnboarding] = useState(() => !isOnboarded());
   const [standalone] = useState(isStandalone);
@@ -60,6 +62,24 @@ export default function App() {
   }, []);
 
   const openSettings = () => setSettingsOpen(true);
+  const openCalendarSetup = () => {
+    setSettingsOpen(false);
+    setCalendarSetupOpen(true);
+  };
+
+  // Re-tapping the already-active tab scrolls it to top instead of no-op'ing,
+  // matching iOS's status-bar-tap behavior — each screen exposes scrollToTop
+  // off its ref (see Screen.jsx).
+  const todayRef = useRef(null);
+  const assignmentsRef = useRef(null);
+  const diningRef = useRef(null);
+  const recRef = useRef(null);
+  const eventsRef = useRef(null);
+  const screenRefs = { today: todayRef, assignments: assignmentsRef, dining: diningRef, rec: recRef, events: eventsRef };
+  const handleTabChange = (id) => {
+    if (id === tab) screenRefs[id].current?.scrollToTop();
+    else setTab(id);
+  };
 
   // Opened as a regular browser tab, not installed: this is the entry point
   // in browser mode, not an interstitial — the primary call to action is
@@ -81,30 +101,46 @@ export default function App() {
         position and loaded data survive tab switches like they do on iOS.
       */}
       <TabPane active={tab === 'today'}>
-        <TodayScreen onOpenSettings={openSettings} onNavigate={setTab} />
+        <TodayScreen
+          ref={todayRef}
+          onOpenSettings={openSettings}
+          onSetupCalendar={openCalendarSetup}
+          onNavigate={setTab}
+        />
       </TabPane>
       <TabPane active={tab === 'assignments'}>
-        <AssignmentsScreen onOpenSettings={openSettings} />
+        <AssignmentsScreen ref={assignmentsRef} onOpenSettings={openSettings} />
       </TabPane>
       <TabPane active={tab === 'dining'}>
         <DiningScreen
+          ref={diningRef}
           active={tab === 'dining'}
           onMapModeChange={setDiningMapActive}
           onPinSheetChange={setDiningPinOpen}
         />
       </TabPane>
       <TabPane active={tab === 'rec'}>
-        <RecScreen />
+        <RecScreen ref={recRef} />
       </TabPane>
       <TabPane active={tab === 'events'}>
-        <EventsScreen />
+        <EventsScreen ref={eventsRef} />
       </TabPane>
 
       {!tabBarHidden && (
-        <TabBar active={tab} onChange={setTab} badges={badges} floating={tabBarFloating} />
+        <TabBar active={tab} onChange={handleTabChange} badges={badges} floating={tabBarFloating} />
       )}
 
-      <SettingsScreen open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsScreen
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSetupCalendar={openCalendarSetup}
+      />
+
+      {calendarSetupOpen && (
+        <div className="absolute inset-0 z-40 bg-bg">
+          <CalendarSetupScreen onDone={() => setCalendarSetupOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }

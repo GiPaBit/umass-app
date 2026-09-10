@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import { Button, RoundButton, Spinner, StaleNotice } from '../components/ui.jsx';
 import { GearIcon } from '../components/Icons.jsx';
@@ -17,7 +17,7 @@ import { DEFAULT_BRIEF_PREFS } from '../lib/briefPrefs.js';
  * the week ahead. Anything named in them is tappable and jumps to the tab that
  * owns it, so this page stays a summary rather than a second copy of the app.
  */
-export function TodayScreen({ onOpenSettings, onNavigate }) {
+export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onSetupCalendar, onNavigate }, ref) {
   const [calendarIds] = useLocalState(KEYS.canvasCalendars, []);
   const [feeds] = useLocalState(KEYS.feeds, []);
   const [done] = useLocalState(KEYS.doneAssignments, {});
@@ -97,6 +97,7 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
 
   return (
     <Screen
+      ref={ref}
       title="Today"
       subtitle={dateLine}
       onRefresh={refresh}
@@ -145,7 +146,7 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
               <p className="text-[15px] leading-[20px] text-label-2">
                 Connect a calendar to fold your assignments into the brief.
               </p>
-              <Button variant="tinted" className="mt-3" onClick={onOpenSettings}>
+              <Button variant="tinted" className="mt-3" onClick={onSetupCalendar}>
                 Set up
               </Button>
             </div>
@@ -160,7 +161,7 @@ export function TodayScreen({ onOpenSettings, onNavigate }) {
       )}
     </Screen>
   );
-}
+});
 
 function lowerFirst(text) {
   return text ? text[0].toLowerCase() + text.slice(1) : text;

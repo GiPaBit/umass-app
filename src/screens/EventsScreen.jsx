@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { forwardRef, useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
   Badge,
@@ -30,7 +30,7 @@ const FILTERS = [
   { value: 'quick', label: 'Mine' },
 ];
 
-export function EventsScreen() {
+export const EventsScreen = forwardRef(function EventsScreen(_props, ref) {
   const { data, error, loading, refresh } = useAsync(() => getEvents(21));
   const [quickEvents] = useLocalState(KEYS.quickEvents, []);
   const [filter, setFilter] = useState('all');
@@ -55,6 +55,7 @@ export function EventsScreen() {
 
   return (
     <Screen
+      ref={ref}
       title="Events"
       subtitle={data || quickEvents.length ? `${filtered.length} upcoming` : undefined}
       onRefresh={refresh}
@@ -135,7 +136,7 @@ export function EventsScreen() {
       />
     </Screen>
   );
-}
+});
 
 /* -------------------------------------------------------------------------- */
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
   Button,
@@ -34,7 +34,10 @@ import { statusLine } from '../lib/diningStatus.js';
 import { KEYS } from '../lib/storage.js';
 import { getProfile, matchesName, setProfile } from '../lib/profile.js';
 
-export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange }) {
+export const DiningScreen = forwardRef(function DiningScreen(
+  { active = true, onMapModeChange, onPinSheetChange },
+  ref,
+) {
   const { data, error, loading, refresh } = useAsync(getDiningOverview);
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
@@ -196,6 +199,7 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
 
   return (
     <Screen
+      ref={ref}
       title="Dining"
       subtitle={data ? `${openCount} open right now` : undefined}
       onRefresh={refresh}
@@ -334,7 +338,7 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
       <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} onViewFullMenu={setMenuHall} />
     </Screen>
   );
-}
+});
 
 /**
  * A dining-list row with a leading pin/star toggle, synced with

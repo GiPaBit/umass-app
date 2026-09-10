@@ -20,12 +20,13 @@ import { FEED_KINDS, deleteFeed, listFeeds, maskUrl } from '../lib/feeds.js';
 import { FONTS, MODES, THEMES, getAppearance, setAppearance } from '../lib/theme.js';
 import { getProfile, setProfile } from '../lib/profile.js';
 import { DEFAULT_BRIEF_PREFS, setBriefPrefs } from '../lib/briefPrefs.js';
+import { containsBlockedWord } from '../lib/profanityFilter.js';
 
 /**
  * Settings is a short menu rather than one long scroll: each area opens as its
  * own page, so nothing competes for attention.
  */
-export function SettingsScreen({ open, onClose }) {
+export function SettingsScreen({ open, onClose, onSetupCalendar }) {
   const [page, setPage] = useState(null);
   const [done, setDone] = useLocalState(KEYS.doneAssignments, {});
   const [quickEvents, setQuickEvents] = useLocalState(KEYS.quickEvents, []);
@@ -68,7 +69,7 @@ export function SettingsScreen({ open, onClose }) {
             <Row
               title="Calendars"
               subtitle={feedCount ? `${feedCount} connected` : 'Not connected'}
-              onClick={() => setPage('calendars')}
+              onClick={() => (feedCount ? setPage('calendars') : onSetupCalendar?.())}
               last
             />
           </ListGroup>
@@ -169,6 +170,7 @@ export function SettingsScreen({ open, onClose }) {
         title="Name"
         value={profile.name}
         onSave={(name) => setProfile({ name: name.trim() })}
+        isValid={(value) => !containsBlockedWord(value)}
       >
         {(value, setValue) => <NameField value={value} onChange={setValue} />}
       </PreferenceSheet>
@@ -231,7 +233,7 @@ export function SettingsScreen({ open, onClose }) {
  * the current value, only writing it back to the profile on Save so a
  * cancel/dismiss mid-edit doesn't touch anything else.
  */
-function PreferenceSheet({ open, onClose, title, value: initial, onSave, children }) {
+function PreferenceSheet({ open, onClose, title, value: initial, onSave, isValid, children }) {
   const [value, setValue] = useState(initial);
 
   useEffect(() => {
@@ -246,6 +248,7 @@ function PreferenceSheet({ open, onClose, title, value: initial, onSave, childre
         {children(value, setValue)}
         <Button
           className="mt-5 w-full"
+          disabled={isValid ? !isValid(value) : false}
           onClick={() => {
             onSave(value);
             onClose();

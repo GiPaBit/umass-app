@@ -5,6 +5,7 @@ import { WorkoutPreferencePicker } from '../components/WorkoutPreferencePicker.j
 import { NameField } from '../components/NameField.jsx';
 import { SportsPicker } from '../components/SportsPicker.jsx';
 import { getProfile, setProfile } from '../lib/profile.js';
+import { containsBlockedWord } from '../lib/profanityFilter.js';
 
 /**
  * The interests questionnaire. Used twice: full-screen on first launch, and
@@ -61,6 +62,7 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
 
   const current = steps[step];
   const last = step === steps.length - 1;
+  const nameBlocked = containsBlockedWord(draft.name);
 
   const finish = () => {
     // Not `onboarded: true` here — during first launch that flag is only set
@@ -109,11 +111,15 @@ export function PreferencesFlow({ onDone, onCancel, finishLabel = 'Save' }) {
               </Button>
             )
           )}
-          <Button className="flex-1" onClick={last ? finish : () => setStep((s) => s + 1)}>
+          <Button
+            className="flex-1"
+            disabled={nameBlocked}
+            onClick={last ? finish : () => setStep((s) => s + 1)}
+          >
             {last ? finishLabel : 'Continue'}
           </Button>
         </div>
-        {!onCancel && (
+        {!onCancel && !nameBlocked && (
           <button
             type="button"
             onClick={finish}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
   Badge,
@@ -35,7 +35,7 @@ const VIEWS = [
   { value: 'calendar', label: 'Calendar' },
 ];
 
-export function AssignmentsScreen({ onOpenSettings }) {
+export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onOpenSettings }, ref) {
   const [calendarIds] = useLocalState(KEYS.canvasCalendars, []);
   const [feeds] = useLocalState(KEYS.feeds, []);
   const [done, setDone] = useLocalState(KEYS.doneAssignments, {});
@@ -122,7 +122,7 @@ export function AssignmentsScreen({ onOpenSettings }) {
 
   if (source === SOURCE.none) {
     return (
-      <Screen title="Assignments">
+      <Screen ref={ref} title="Assignments">
         <EmptyState
           title="Connect Canvas"
           message="Paste your Canvas calendar feed link in Settings — it comes from Canvas → Calendar → “Calendar Feed”. No Google account needed."
@@ -134,6 +134,7 @@ export function AssignmentsScreen({ onOpenSettings }) {
 
   return (
     <Screen
+      ref={ref}
       title="Assignments"
       subtitle={`${pending.length} open${completed.length ? ` · ${completed.length} done` : ''}`}
       onRefresh={refresh}
@@ -203,7 +204,7 @@ export function AssignmentsScreen({ onOpenSettings }) {
       />
     </Screen>
   );
-}
+});
 
 /* -------------------------------------------------------------------------- */
 

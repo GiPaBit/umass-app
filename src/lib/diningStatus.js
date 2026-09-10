@@ -9,15 +9,25 @@ export function statusLine(status) {
   if (!status) return 'Hours unavailable';
 
   if (status.state === 'open') {
-    if (status.hoursText && !/^open$/i.test(status.hoursText.trim())) return status.hoursText;
+    if (status.hoursText && !isRedundantWithPill(status.hoursText, 'open')) return status.hoursText;
     return null;
   }
 
   if (status.state === 'closed') {
     if (status.opensLabel) return status.opensLabel;
-    if (status.hoursText && !/^closed$/i.test(status.hoursText.trim())) return status.hoursText;
+    if (status.hoursText && !isRedundantWithPill(status.hoursText, 'closed')) return status.hoursText;
     return null;
   }
 
   return status.hoursText || 'Hours unavailable';
+}
+
+/**
+ * True when `text` says nothing beyond what the pill already shows — e.g.
+ * "Closed", "Closed Today", "Closed." next to a `closed` pill. Was previously
+ * an exact-string check, which missed "Closed Today" and produced a visible
+ * "Closed" pill next to a redundant "Closed Today" line.
+ */
+function isRedundantWithPill(text, state) {
+  return new RegExp(`^${state}\\s*(today)?\\.?$`, 'i').test(text.trim());
 }

@@ -33,6 +33,22 @@ export const RETAIL_CATEGORIES = [
  * NOTE: the site ignores a ?date= query param and always serves today, so there
  * is no point exposing date selection in the UI.
  */
+/**
+ * Standard meal-period windows, same across all four halls — the site itself
+ * doesn't publish these (only whole-hall open/close hours), so this is fixed
+ * schedule data rather than scraped. Which meals actually apply to a given
+ * hall on a given day still comes entirely from `parseMenuPage`'s own
+ * per-panel scrape below (e.g. Berkshire has no breakfast panel, Franklin and
+ * Hampshire have no latenight panel) — this table only supplies the time
+ * range once a meal is known to exist.
+ */
+const MEAL_TIMES = {
+  breakfast: '7:00 AM – 11:00 AM',
+  lunch: '11:00 AM – 4:30 PM',
+  dinner: '4:30 PM – 9:00 PM',
+  latenight: '9:00 PM – 12:00 AM',
+};
+
 export function parseMenuPage(html) {
   const dateLine = html.match(/<h1 id="content_title">([^<]*)<\/h1>/i);
 
@@ -43,7 +59,7 @@ export function parseMenuPage(html) {
     const stations = parseStations(panel);
     const itemCount = stations.reduce((n, s) => n + s.items.length, 0);
     if (itemCount === 0) continue;
-    meals.push({ meal, label: titleCase(meal), stations, itemCount });
+    meals.push({ meal, label: titleCase(meal), timeLabel: MEAL_TIMES[meal] || null, stations, itemCount });
   }
 
   return {
@@ -345,4 +361,59 @@ function formatMinutes(mins) {
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   const suffix = h24 < 12 ? 'AM' : 'PM';
   return m === 0 ? `${h12} ${suffix}` : `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+/**
+ * "Monday-Sunday" / "Monday-Friday" / "Saturday-Sunday" / "Sunday" -> the set
+ * of weekday indices (0=Sunday) it covers, or null if `text` names no weekday
+ * at all (e.g. a venue-name label like "Worcester Commons" rather than a day
+ * range) — the caller uses that null to tell the two kinds of label apart.
+ */
+function parseDaySet(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  const days = new Set();
+  let consumed = t;
+
+  const rangeRe = new RegExp(`(${WEEKDAYS.join('|')})\\s*-\\s*(${WEEKDAYS.join('|')})`, 'g');
+  let rm;
+  while ((rm = rangeRe.exec(t))) {
+    const start = WEEKDAYS.indexOf(rm[1]);
+    const end = WEEKDAYS.indexOf(rm[2]);
+    for (let i = start; ; i = (i + 1) % 7) {
+      days.add(i);
+      if (i === end) break;
+    }
+    consumed = consumed.replace(rm[0], '');
+  }
+  for (let i = 0; i < WEEKDAYS.length; i++) {
+    if (consumed.includes(WEEKDAYS[i])) days.add(i);
+  }
+
+  return days.size ? days : null;
+}
+
+/**
+ * Best-effort "opens tomorrow"/"opens Monday" label for a venue that's closed
+ * for the rest of today, derived from its own scraped day-range label (e.g.
+ * "Monday-Friday") paired with its hours line — never a guessed date. Returns
+ * null when `dayRangeText` doesn't parse as a set of weekdays, or the hours
+ * text has no parseable time range.
+ */
+export function reopenLabel(dayRangeText, hoursText, now = nowInAmherst()) {
+  const daySet = parseDaySet(dayRangeText);
+  const ranges = parseRanges(hoursText);
+  if (!daySet || !ranges.length) return null;
+
+  const earliestStart = Math.min(...ranges.map((r) => r.start));
+  const todayIdx = now.getDay();
+  for (let d = 1; d <= 7; d++) {
+    const idx = (todayIdx + d) % 7;
+    if (!daySet.has(idx)) continue;
+    const dayLabel = d === 1 ? 'tomorrow' : WEEKDAYS[idx].replace(/^./, (c) => c.toUpperCase());
+    return `Opens ${dayLabel} at ${formatMinutes(earliestStart)}`;
+  }
+  return null;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
-  Badge,
+  Button,
   EmptyState,
   ErrorState,
   FailureNotice,
@@ -15,6 +15,7 @@ import {
   StatusPill,
 } from '../components/ui.jsx';
 import { ChevronIcon, StarIcon } from '../components/Icons.jsx';
+import { MenuScreen } from './MenuScreen.jsx';
 import { getDiningOverview, getHallMenu } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useLocalState } from '../hooks/useLocalState.js';
@@ -38,6 +39,7 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
+  const [menuHall, setMenuHall] = useState(null);
 
   // Re-renders whenever the profile changes (e.g. pinning from Settings'
   // Favorite Dining picker) so this list's stars stay in sync both ways.
@@ -69,6 +71,11 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
   // selected for next time you come back.
   useEffect(() => {
     if (!active) setSelectedPin(null);
+  }, [active]);
+
+  // Same for a full menu page left open — never leave it showing for next visit.
+  useEffect(() => {
+    if (!active) setMenuHall(null);
   }, [active]);
 
   const changeView = (next) => {
@@ -125,6 +132,13 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
       ]
     : [];
 
+  // Full-screen menu takes over from either the list or map view — closing it
+  // returns to whichever was showing, with the venue's sheet (still tracked
+  // in `detailTarget`) open exactly where it was left.
+  if (menuHall) {
+    return <MenuScreen hall={menuHall} onClose={() => setMenuHall(null)} />;
+  }
+
   if (data && view === 'map') {
     return (
       <div className="relative h-full w-full overflow-hidden bg-bg">
@@ -175,7 +189,7 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
           onClose={() => setSelectedPin(null)}
         />
 
-        <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} />
+        <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} onViewFullMenu={setMenuHall} />
       </div>
     );
   }
@@ -317,7 +331,7 @@ export function DiningScreen({ active = true, onMapModeChange, onPinSheetChange 
         </>
       )}
 
-      <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} />
+      <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} onViewFullMenu={setMenuHall} />
     </Screen>
   );
 }
@@ -441,18 +455,33 @@ function MapPinSheet({ pin, statusOf, resolveTarget, onClose }) {
 /* both as a full sheet (list view) and inline inside the map pin accordion.  */
 /* -------------------------------------------------------------------------- */
 
-function VenueDetailSheet({ target, onClose }) {
+// Two detents so a long menu/hours list can be dragged up to full height,
+// same as the map pin sheet — previously a single fixed "content" detent
+// capped at 92vh, which is what made a tall sheet awkward to scroll.
+const VENUE_DETAIL_DETENTS = [
+  { key: 'full', height: 'viewport' },
+  { key: 'content', height: 'content' },
+];
+
+function VenueDetailSheet({ target, onClose, onViewFullMenu }) {
   const isHall = target?.type === 'hall';
   const name = isHall ? target.hall?.name : target?.venue?.name;
 
   return (
-    <Sheet open={Boolean(target)} onClose={onClose} title={name || ''}>
-      {target && <VenueDetail target={target} />}
+    <Sheet
+      open={Boolean(target)}
+      onClose={onClose}
+      title={name || ''}
+      detents={VENUE_DETAIL_DETENTS}
+      initialDetent="content"
+      contentKey={name}
+    >
+      {target && <VenueDetail target={target} onViewFullMenu={onViewFullMenu} />}
     </Sheet>
   );
 }
 
-function VenueDetail({ target }) {
+function VenueDetail({ target, onViewFullMenu }) {
   const isHall = target?.type === 'hall';
   const hall = isHall ? target.hall : null;
   const venue = !isHall ? target?.venue : null;
@@ -464,14 +493,14 @@ function VenueDetail({ target }) {
     { enabled: Boolean(isHall && hall) },
   );
 
-  const [meal, setMeal] = useState(null);
   const meals = data?.meals || [];
-  // Default to the meal that best matches the current time, like the dining app does.
-  const activeMeal = meal && meals.some((m) => m.meal === meal) ? meal : defaultMeal(meals);
-  const current = meals.find((m) => m.meal === activeMeal);
-
   const noLocation = hasNoFixedLocation(name);
   const links = name && !noLocation ? mapLinks({ name }) : null;
+  // Every location gets a one-line blurb: the live scrape's own teaser for
+  // retail venues when there is one, else the catalog's hand-written copy —
+  // dining halls never get a scraped teaser at all, so this is their only
+  // description.
+  const blurb = (!isHall && venue?.description) || findVenue(name)?.blurb || null;
 
   return (
     <>
@@ -490,10 +519,8 @@ function VenueDetail({ target }) {
               )}
             </div>
           ) : null}
-          {!noLocation && venue?.description && (
-            <p className="mt-3 text-[15px] leading-[21px] text-label">{venue.description}</p>
-          )}
-          {!noLocation && !venue?.status && !venue?.description && (
+          {!noLocation && blurb && <p className="mt-3 text-[15px] leading-[21px] text-label">{blurb}</p>}
+          {!noLocation && !venue?.status && !blurb && (
             <p className="text-[14px] leading-[19px] text-label-2">
               No live details for this spot right now.
             </p>
@@ -501,9 +528,10 @@ function VenueDetail({ target }) {
         </div>
       )}
 
-      {isHall && data && (
+      {isHall && (blurb || data) && (
         <div className="px-4 pt-3">
-          <p className="text-[13px] text-label-2">{data.dateLabel}</p>
+          {blurb && <p className="text-[15px] leading-[21px] text-label">{blurb}</p>}
+          {data && <p className={blurb ? 'mt-2 text-[13px] text-label-2' : 'text-[13px] text-label-2'}>{data.dateLabel}</p>}
         </div>
       )}
 
@@ -573,43 +601,11 @@ function VenueDetail({ target }) {
       )}
 
       {isHall && meals.length > 0 && (
-        <>
-          <div className="px-4 pt-5">
-            <SegmentedControl
-              options={meals.map((m) => ({ value: m.meal, label: m.label }))}
-              value={activeMeal}
-              onChange={setMeal}
-            />
-          </div>
-
-          {current?.stations.map((station) => (
-            <div key={station.name}>
-              <SectionHeader>{station.name}</SectionHeader>
-              <ListGroup>
-                {station.items.map((item, i) => (
-                  <Row key={`${item.name}-${i}`} last={i === station.items.length - 1}>
-                    <div className="text-[16px] leading-[21px] text-label">{item.name}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {item.calories != null && (
-                        <span className="text-[12px] text-label-2">{item.calories} cal</span>
-                      )}
-                      {item.diets.slice(0, 3).map((d) => (
-                        <Badge key={d} tone={dietTone(d)}>
-                          {d}
-                        </Badge>
-                      ))}
-                      {item.allergens.length > 0 && (
-                        <span className="text-[12px] text-ios-orange">
-                          {item.allergens.slice(0, 3).join(', ')}
-                        </span>
-                      )}
-                    </div>
-                  </Row>
-                ))}
-              </ListGroup>
-            </div>
-          ))}
-        </>
+        <div className="px-4 pt-5 pb-2">
+          <Button variant="tinted" className="w-full" onClick={() => onViewFullMenu?.(hall)}>
+            View Full Menu
+          </Button>
+        </div>
       )}
     </>
   );
@@ -631,6 +627,7 @@ function VenueMapSummary({ target }) {
   const noLocation = hasNoFixedLocation(name);
   const status = isHall ? hall?.status : venue?.status;
   const links = name && !noLocation ? mapLinks({ name }) : null;
+  const blurb = (!isHall && venue?.description) || findVenue(name)?.blurb || null;
 
   return (
     <>
@@ -645,6 +642,7 @@ function VenueMapSummary({ target }) {
             )}
           </div>
         )}
+        {!noLocation && blurb && <p className="mt-2 text-[14px] leading-[19px] text-label-2">{blurb}</p>}
       </div>
 
       {links && (
@@ -666,19 +664,3 @@ function VenueMapSummary({ target }) {
   );
 }
 
-function dietTone(diet) {
-  const d = diet.toLowerCase();
-  if (d.includes('vegan') || d.includes('plant')) return 'green';
-  if (d.includes('halal')) return 'teal';
-  if (d.includes('vegetarian')) return 'green';
-  if (d.includes('whole grain')) return 'orange';
-  return 'gray';
-}
-
-/** Pick breakfast / lunch / dinner from the wall clock. */
-function defaultMeal(meals) {
-  if (!meals.length) return null;
-  const hour = new Date().getHours();
-  const want = hour < 10.5 ? 'breakfast' : hour < 16 ? 'lunch' : 'dinner';
-  return meals.find((m) => m.meal === want)?.meal || meals[0].meal;
-}

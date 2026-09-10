@@ -9,6 +9,7 @@ import {
   parseLocationHours,
   parseMenuPage,
   parseRetailListing,
+  reopenLabel,
 } from './_lib/dining.js';
 
 /**
@@ -97,11 +98,27 @@ async function getOverview() {
 /** Prefer a section whose title mentions the current season/"today"; fall back to the first parseable one. */
 function statusFromSections(sections) {
   for (const section of sections) {
+    // Track the day-range label ("Monday-Sunday") immediately preceding an
+    // hours line, so a "closed for the rest of today" result can say when it
+    // reopens instead of just "opens later today" (which doesn't apply).
+    let dayRangeText = null;
     for (const line of section.lines) {
+      if (line.kind === 'label') {
+        dayRangeText = line.text;
+        continue;
+      }
       if (line.kind !== 'hours') continue;
       const status = classifyHours(line.text);
       if (status.state !== 'unknown') {
-        return { ...status, from: section.title, hoursText: line.text, opensLabel: opensLabel(status) };
+        return {
+          ...status,
+          from: section.title,
+          hoursText: line.text,
+          // reopenLabel is a "closed for the rest of today" fallback only —
+          // opensLabel() already returns null for an 'open' status, but it's
+          // not the one deciding whether a reopen label applies at all.
+          opensLabel: status.state === 'closed' ? opensLabel(status) || reopenLabel(dayRangeText, line.text) : null,
+        };
       }
     }
   }

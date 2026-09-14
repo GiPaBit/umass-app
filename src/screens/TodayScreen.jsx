@@ -24,6 +24,11 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
   const [quickEvents] = useLocalState(KEYS.quickEvents, []);
   const [profileRaw] = useLocalState(KEYS.profile, null);
   const [briefPrefs] = useLocalState(KEYS.briefPrefs, DEFAULT_BRIEF_PREFS);
+  // Not read directly — just here so renaming a course on the Assignments tab
+  // (which writes this key, but changes no assignment or event data) still
+  // invalidates the brief's useMemos below instead of leaving the old course
+  // name typed out until something else causes a recompute.
+  const [courseNicknames] = useLocalState(KEYS.courseNicknames, {});
 
   // Once skipped, stay skipped for the rest of the session.
   const [skipped, setSkipped] = useState(false);
@@ -73,12 +78,12 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
         dining: dining.data,
         rec: rec.data,
       }),
-    [profile, openAssignments, allEvents, dining.data, rec.data],
+    [profile, openAssignments, allEvents, dining.data, rec.data, courseNicknames],
   );
 
   const weekBriefRaw = useMemo(
     () => composeWeekBrief({ profile, assignments: openAssignments, events: allEvents }),
-    [profile, openAssignments, allEvents],
+    [profile, openAssignments, allEvents, courseNicknames],
   );
 
   // Reads as a continuation of the daily brief rather than a new section, once

@@ -4,6 +4,15 @@ import { parseRecSections } from './shared.js';
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// The hours page's own "Pools" subheadings are bare "Boyden" / "Curry Hicks" —
+// ambiguous next to the page's separate "Boyden Gymnasium" facility — so
+// disambiguate on the way out rather than showing the scraped heading verbatim.
+const FACILITY_NAME_OVERRIDES = { boyden: 'Boyden Pool', 'curry hicks': 'Curry Hicks Pool' };
+
+function displayFacilityName(heading) {
+  return FACILITY_NAME_OVERRIDES[heading.trim().toLowerCase()] || heading;
+}
+
 /**
  * Turn hour sections into facilities with a resolved status for *today*.
  * Lines look like "Monday - Friday: 7:00am -7:00pm" or "Saturday - Sunday: CLOSED".
@@ -40,7 +49,7 @@ export function buildFacilities(sections) {
       else status = { state: 'unknown', ranges: [] };
 
       return {
-        name: section.heading,
+        name: displayFacilityName(section.heading),
         schedule,
         today: todayEntry ? { days: todayEntry.dayLabel, hoursText: todayEntry.timeText } : null,
         status,
@@ -171,6 +180,22 @@ function extractNoticeDate(text, now) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/** Every "Month Day[, Year]" mention in a blob of text, as end-of-day Dates. */
+function extractAllDates(text, now) {
+  const re =
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/gi;
+  const dates = [];
+  let m;
+  while ((m = re.exec(text))) {
+    const month = MONTHS.indexOf(m[1].toLowerCase());
+    const day = Number(m[2]);
+    const year = m[3] ? Number(m[3]) : now.getFullYear();
+    const d = new Date(year, month, day, 23, 59, 59);
+    if (!Number.isNaN(d.getTime())) dates.push(d);
+  }
+  return dates;
+}
+
 /**
  * Attach a best-effort date to each notice and drop only the ones we could
  * confidently parse *and* confirm are in the past — anything undated (a date we
@@ -195,9 +220,18 @@ export function buildNotices(rawLines) {
  * only extracts the banner to show verbatim and prominently, rather than
  * attempting a structured per-facility override.
  */
-export function parseHomepageAlert(html) {
+export function parseHomepageAlert(html, now = nowInAmherst()) {
   const sections = parseRecSections(html);
   const alert = sections.find((s) => /alert/i.test(s.heading));
   if (!alert) return null;
+
+  // The banner's own dates (baked into the heading itself, e.g. "...through
+  // Monday, September 7, 2026...") are the only freshness signal available —
+  // once every date it mentions is in the past, the schedule it describes is
+  // over and the banner is stale. No parseable date at all stays visible
+  // rather than silently vanishing, same as buildNotices above.
+  const dates = extractAllDates([alert.heading, ...alert.lines].join(' '), now);
+  if (dates.length && Math.max(...dates.map((d) => d.getTime())) < now.getTime()) return null;
+
   return { heading: alert.heading, lines: alert.lines };
 }

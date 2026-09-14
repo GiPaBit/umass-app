@@ -82,10 +82,12 @@ export const DINING_GROUPS = [
     // sentence) — a fallback for when the live retail-listing scrape doesn't
     // return a description; the live teaser is preferred when present.
     venues: [
-      // Co-located with each other, but far enough from the Blue Wall coordinate
-      // below to stay a distinct pin rather than being swallowed into it.
-      { name: 'Harvest Market', lat: 42.39175, lon: -72.52676, blurb: 'Grocery-style market on the Campus Center concourse with a global hot bar, salad bar, and grab-and-go options.' },
-      { name: "People's Organic Coffee", lat: 42.39175, lon: -72.52676, blurb: 'Organic coffee, teas, salads, and baked pastries on the Campus Center concourse.' },
+      // Co-located with each other, nudged further from the Blue Wall
+      // coordinate below than their exact real-world spot — close enough on a
+      // stylised map to still merge together, which was making the two pins
+      // hard to tap apart.
+      { name: 'Harvest Market', lat: 42.39219, lon: -72.52652, blurb: 'Grocery-style market on the Campus Center concourse with a global hot bar, salad bar, and grab-and-go options.' },
+      { name: "People's Organic Coffee", lat: 42.39219, lon: -72.52652, blurb: 'Organic coffee, teas, salads, and baked pastries on the Campus Center concourse.' },
       // On the top floor of Worcester Commons — shares the hall's coordinate so
       // it clusters into the one Worcester pin along with the café and grab'n go.
       { name: 'The Commonwealth Restaurant', lat: 42.393256, lon: -72.525107, blurb: "Student-run, full-service restaurant on Worcester Commons' top floor with table service and campus views." },

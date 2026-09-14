@@ -22,6 +22,13 @@ export const KEYS = {
   briefPrefs: `${PREFIX}brief-prefs`,
   // "Continue in browser" on the install page — see ALWAYS_SHOW_INSTALL_PAGE in App.jsx.
   installDismissed: `${PREFIX}install-dismissed`,
+  // Heading text of the last RecWell facility alert the user collapsed — compared
+  // against the live alert's own heading so a genuinely new alert re-expands.
+  recAlertCollapsed: `${PREFIX}rec-alert-collapsed`,
+  // { [courseCode]: nickname } — same idea as Canvas's own per-course nicknames,
+  // but local to this app since Canvas's are themselves only ever browser-local
+  // and never appear in the calendar feed.
+  courseNicknames: `${PREFIX}course-nicknames`,
 };
 
 export function read(key, fallback) {
@@ -63,6 +70,9 @@ const CONNECTION_KEYS = [
   KEYS.profile,
   KEYS.theme,
   KEYS.briefPrefs,
+  // A course rename is a standing preference about a course, not a to-do
+  // mark — "clear my data" shouldn't undo it any more than it undoes theme.
+  KEYS.courseNicknames,
 ];
 
 export function clearAll({ keepAuth = false } = {}) {

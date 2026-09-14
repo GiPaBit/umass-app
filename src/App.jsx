@@ -109,7 +109,7 @@ export default function App() {
         />
       </TabPane>
       <TabPane active={tab === 'assignments'}>
-        <AssignmentsScreen ref={assignmentsRef} onOpenSettings={openSettings} />
+        <AssignmentsScreen ref={assignmentsRef} onSetupCalendar={openCalendarSetup} />
       </TabPane>
       <TabPane active={tab === 'dining'}>
         <DiningScreen

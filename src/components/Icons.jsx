@@ -131,6 +131,15 @@ export function ExternalIcon(p) {
   );
 }
 
+export function PencilIcon(p) {
+  return (
+    <svg {...base} width={18} height={18} strokeWidth={2} {...p}>
+      <path d="M14.5 4.5l5 5L8 21H3v-5z" />
+      <path d="M12.5 6.5l5 5" />
+    </svg>
+  );
+}
+
 export function SearchIcon(p) {
   return (
     <svg {...base} width={18} height={18} strokeWidth={2.2} {...p}>

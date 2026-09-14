@@ -42,6 +42,12 @@ export const DiningScreen = forwardRef(function DiningScreen(
   const [view, setView] = useState('list');
   const [selectedPin, setSelectedPin] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
+  // Origin pin for a solo-venue detail sheet opened straight from the map —
+  // tracked separately from `selectedPin` (which is only ever set for a
+  // multi-venue pin's own accordion sheet) so a single-venue pin still gets
+  // the same "grow while its sheet is open" highlight the map already gives
+  // multi-venue pins.
+  const [detailPinId, setDetailPinId] = useState(null);
   const [menuHall, setMenuHall] = useState(null);
 
   // Re-renders whenever the profile changes (e.g. pinning from Settings'
@@ -73,7 +79,10 @@ export const DiningScreen = forwardRef(function DiningScreen(
   // Leaving the Dining tab (or the map sub-view) should never leave a pin
   // selected for next time you come back.
   useEffect(() => {
-    if (!active) setSelectedPin(null);
+    if (!active) {
+      setSelectedPin(null);
+      setDetailPinId(null);
+    }
   }, [active]);
 
   // Same for a full menu page left open — never leave it showing for next visit.
@@ -149,12 +158,13 @@ export const DiningScreen = forwardRef(function DiningScreen(
           <CampusMap
             venues={ALL_VENUES}
             statusOf={statusOf}
-            selectedPinId={selectedPin?.id}
+            selectedPinId={selectedPin?.id || detailPinId}
             onSelectPin={(pin) => {
               // A pin with exactly one venue has nothing to disambiguate —
               // skip straight to its full detail sheet instead of the
               // accordion-of-venues popup.
               if (pin && pin.venues.length === 1) {
+                setDetailPinId(pin.id);
                 setDetailTarget(resolveTarget(pin.venues[0].name));
               } else {
                 setSelectedPin(pin);
@@ -192,7 +202,14 @@ export const DiningScreen = forwardRef(function DiningScreen(
           onClose={() => setSelectedPin(null)}
         />
 
-        <VenueDetailSheet target={detailTarget} onClose={() => setDetailTarget(null)} onViewFullMenu={setMenuHall} />
+        <VenueDetailSheet
+          target={detailTarget}
+          onClose={() => {
+            setDetailTarget(null);
+            setDetailPinId(null);
+          }}
+          onViewFullMenu={setMenuHall}
+        />
       </div>
     );
   }
@@ -296,9 +313,7 @@ export const DiningScreen = forwardRef(function DiningScreen(
                 onClick={() => setDetailTarget({ type: 'retail', venue: { name: truck.name } })}
               >
                 <div className="text-[17px] leading-[22px] text-label">{truck.name}</div>
-                <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">
-                  {truck.blurb || FOOD_TRUCK_NOTE}
-                </div>
+                <div className="mt-0.5 text-[13px] leading-[17px] text-label-2">{FOOD_TRUCK_NOTE}</div>
                 {(truck.instagram || truck.website) && (
                   <div className="mt-1.5 flex gap-3">
                     {truck.instagram && (
@@ -505,6 +520,7 @@ function VenueDetail({ target, onViewFullMenu }) {
   // dining halls never get a scraped teaser at all, so this is their only
   // description.
   const blurb = (!isHall && venue?.description) || findVenue(name)?.blurb || null;
+  const website = !isHall && noLocation ? findVenue(name)?.website : null;
 
   return (
     <>
@@ -514,7 +530,12 @@ function VenueDetail({ target, onViewFullMenu }) {
       {!isHall && (
         <div className="px-4 pt-3">
           {noLocation ? (
-            <p className="text-[14px] leading-[19px] text-label-2">{FOOD_TRUCK_NOTE}</p>
+            <>
+              {/* Food trucks get their blurb here in the popup only — not on
+                  the list row, which stays a plain one-liner. */}
+              {blurb && <p className="text-[15px] leading-[21px] text-label">{blurb}</p>}
+              <p className={`text-[14px] leading-[19px] text-label-2 ${blurb ? 'mt-2' : ''}`}>{FOOD_TRUCK_NOTE}</p>
+            </>
           ) : venue?.status ? (
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill state={venue.status.state} />
@@ -564,6 +585,19 @@ function VenueDetail({ target, onViewFullMenu }) {
             className="ios-press-scale block rounded-[12px] bg-fill px-4 py-[10px] text-center text-[15px] font-medium text-ios-blue"
           >
             More info at umassdining.com
+          </a>
+        </div>
+      )}
+
+      {website && (
+        <div className="px-4 pb-2">
+          <a
+            href={website}
+            target="_blank"
+            rel="noreferrer"
+            className="ios-press-scale block rounded-[12px] bg-fill px-4 py-[10px] text-center text-[15px] font-medium text-ios-blue"
+          >
+            Website
           </a>
         </div>
       )}

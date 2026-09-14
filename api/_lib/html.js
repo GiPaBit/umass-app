@@ -22,7 +22,14 @@ export function textOf(html = '') {
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<br\s*\/?>/gi, ' ')
-      .replace(/<[^>]+>/g, ' '),
+      // Block-level tags separate words, so turn those into a space (e.g. two
+      // adjacent <p>/<li> chunks). Everything else is inline styling that can
+      // sit mid-word with no surrounding whitespace in the source (a
+      // dropcap-style "<span>F</span>acility"), so drop it with no space, or a
+      // tag boundary like that turns into a stray space in the output (e.g.
+      // "F acility").
+      .replace(/<\/?(?:div|p|li|tr|td|th|ul|ol|h[1-6])\b[^>]*>/gi, ' ')
+      .replace(/<[^>]+>/g, ''),
   )
     .replace(/\s+/g, ' ')
     .trim();

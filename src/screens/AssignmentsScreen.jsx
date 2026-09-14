@@ -8,14 +8,17 @@ import {
   ErrorState,
   ListGroup,
   LoadingState,
+  RoundButton,
   SectionHeader,
   SegmentedControl,
   Sheet,
 } from '../components/ui.jsx';
+import { PencilIcon } from '../components/Icons.jsx';
 import { useAsync } from '../hooks/useAsync.js';
 import { useLocalState } from '../hooks/useLocalState.js';
 import { KEYS } from '../lib/storage.js';
 import { activeSource, fetchAssignments, SOURCE, titleWithoutCourse } from '../lib/assignments.js';
+import { displayCourse, setCourseNickname } from '../lib/courseNicknames.js';
 import {
   dateKey,
   dayLabel,
@@ -35,13 +38,14 @@ const VIEWS = [
   { value: 'calendar', label: 'Calendar' },
 ];
 
-export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onOpenSettings }, ref) {
+export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onSetupCalendar }, ref) {
   const [calendarIds] = useLocalState(KEYS.canvasCalendars, []);
   const [feeds] = useLocalState(KEYS.feeds, []);
   const [done, setDone] = useLocalState(KEYS.doneAssignments, {});
   const [view, setView] = useState('list');
   const [detail, setDetail] = useState(null);
   const [showDone, setShowDone] = useState(false);
+  const [courseNamesOpen, setCourseNamesOpen] = useState(false);
 
   // Re-resolve whenever either source's settings change.
   const source = activeSource();
@@ -55,6 +59,10 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onOpenS
   const assignments = data || [];
   const pending = useMemo(() => assignments.filter((a) => !done[a.id]), [assignments, done]);
   const completed = useMemo(() => assignments.filter((a) => done[a.id]), [assignments, done]);
+  const courseCodes = useMemo(
+    () => [...new Set(assignments.map((a) => a.course).filter(Boolean))].sort(),
+    [assignments],
+  );
 
   // Rows that were just ticked stay on screen long enough for the rule to sweep
   // across them — otherwise they vanish the instant they are marked done and the
@@ -125,8 +133,8 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onOpenS
       <Screen ref={ref} title="Assignments">
         <EmptyState
           title="Connect Canvas"
-          message="Paste your Canvas calendar feed link in Settings — it comes from Canvas → Calendar → “Calendar Feed”. No Google account needed."
-          action={<Button onClick={onOpenSettings}>Open Settings</Button>}
+          message="Paste your Canvas calendar feed link — it comes from Canvas → Calendar → “Calendar Feed”. No Google account needed."
+          action={<Button onClick={onSetupCalendar}>Set Up</Button>}
         />
       </Screen>
     );
@@ -139,6 +147,13 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onOpenS
       subtitle={`${pending.length} open${completed.length ? ` · ${completed.length} done` : ''}`}
       onRefresh={refresh}
       scrollTopButton
+      trailing={
+        courseCodes.length > 0 && (
+          <RoundButton onClick={() => setCourseNamesOpen(true)} label="Rename courses">
+            <PencilIcon />
+          </RoundButton>
+        )
+      }
     >
       <div className="sticky top-10 z-[5] bg-bg px-4 pt-1 pb-1">
         <SegmentedControl options={VIEWS} value={view} onChange={setView} />
@@ -202,6 +217,12 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onOpenS
         onToggle={() => detail && toggle(detail.id)}
         onClose={() => setDetail(null)}
       />
+
+      <CourseNamesSheet
+        open={courseNamesOpen}
+        onClose={() => setCourseNamesOpen(false)}
+        courses={courseCodes}
+      />
     </Screen>
   );
 });
@@ -213,7 +234,7 @@ function AssignmentDetailSheet({ assignment, checked, onToggle, onClose }) {
   const overdue = !checked && assignment.due && new Date(assignment.due) < new Date();
 
   return (
-    <Sheet open onClose={onClose} title={assignment.course || 'Assignment'}>
+    <Sheet open onClose={onClose} title={displayCourse(assignment.course) || 'Assignment'}>
       <div className="px-4 pt-4">
         <h2 className="text-[22px] leading-[28px] font-bold text-label">
           {titleWithoutCourse(assignment.title)}
@@ -287,7 +308,7 @@ function AssignmentRow({ assignment, checked, onToggle, onOpen, last }) {
           </span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          {assignment.course && <Badge tone="blue">{assignment.course}</Badge>}
+          {assignment.course && <Badge tone="blue">{displayCourse(assignment.course)}</Badge>}
           {!assignment.allDay && assignment.due && (
             <span className="text-[12px] text-label-2">{timeLabel(assignment.due)}</span>
           )}
@@ -420,7 +441,7 @@ function MonthView({ assignments, done, onSelect }) {
             >
               <div className="text-[16px] leading-[21px] text-label">{titleWithoutCourse(a.title)}</div>
               <div className="mt-1 flex items-center gap-1.5">
-                {a.course && <Badge tone="blue">{a.course}</Badge>}
+                {a.course && <Badge tone="blue">{displayCourse(a.course)}</Badge>}
                 {!a.allDay && <span className="text-[12px] text-label-2">{timeLabel(a.due)}</span>}
               </div>
             </button>
@@ -428,5 +449,53 @@ function MonthView({ assignments, done, onSelect }) {
         </ListGroup>
       )}
     </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Canvas has its own per-course nicknames, but those live only in your Canvas
+ * browser session and never reach the calendar feed — this is the local
+ * equivalent, one text field per course code seen in the current assignments.
+ */
+function CourseNamesSheet({ open, onClose, courses }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Course Names">
+      <p className="px-4 pt-3 text-[13px] leading-[18px] text-label-2">
+        Give a course a shorter name — it only changes what you see here, not on Canvas. Leave a field
+        blank to show the course's real name again.
+      </p>
+      <ListGroup className="mx-4 mt-3">
+        {courses.map((code, i) => (
+          <CourseNameRow key={code} code={code} last={i === courses.length - 1} />
+        ))}
+      </ListGroup>
+    </Sheet>
+  );
+}
+
+function CourseNameRow({ code, last }) {
+  const [nicknames] = useLocalState(KEYS.courseNicknames, {});
+  // Local draft so typing updates the field instantly without a storage write
+  // (and the trim/clear logic in setCourseNickname) on every keystroke.
+  const [draft, setDraft] = useState(nicknames[code] || '');
+
+  useEffect(() => {
+    setDraft(nicknames[code] || '');
+  }, [nicknames, code]);
+
+  return (
+    <div className={`px-4 py-[9px] ${last ? '' : 'relative ios-separator'}`} style={{ '--sep-inset': '16px' }}>
+      <div className="text-[13px] text-label-2">{code}</div>
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => setCourseNickname(code, draft)}
+        placeholder={code}
+        className="mt-0.5 w-full bg-transparent text-[17px] text-label outline-none placeholder:text-label-3"
+      />
+    </div>
   );
 }

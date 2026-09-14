@@ -221,6 +221,12 @@ export function parseLocationHours(html) {
 // Campus", which the site apparently lists them on too.
 const KNOWN_FOOD_TRUCKS = ['babyberk', 'babyberk2'];
 
+// The Campus Center listing also carries "Blue Wall" as its own entry — that's
+// just the food court's umbrella name, and its counters (Tavola, Wasabi, etc.)
+// are already each listed individually right alongside it — plus "UMass
+// Store", which isn't a dining venue at all. Neither is worth showing.
+const EXCLUDED_RETAIL_NAMES = [/^blue wall$/i, /umass store/i];
+
 export function parseRetailListing(html, categorySlug) {
   const venues = [];
   const entryRe = /<h2 id="menu_item_title"[^>]*>([\s\S]*?)<\/h2>([\s\S]*?)(?=<h2 id="menu_item_title"|<\/ul>)/gi;
@@ -230,6 +236,7 @@ export function parseRetailListing(html, categorySlug) {
     const body = m[2];
     if (!name) continue;
     if (KNOWN_FOOD_TRUCKS.includes(name.toLowerCase().replace(/[^a-z0-9]/g, ''))) continue;
+    if (EXCLUDED_RETAIL_NAMES.some((re) => re.test(name))) continue;
 
     const hoursBlock = body.match(
       /<h3>\s*Today'?s Hours\s*<\/h3>\s*<div id="dining_location_text">([\s\S]*?)<\/div>/i,

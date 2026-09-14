@@ -1,6 +1,8 @@
 import { dateKey, isToday, timeLabel, todayKey, shiftKey, dayLabelFromKey } from './dates.js';
 import { matchesName, matchesSports, workoutFacilityMatch } from './profile.js';
 import { venuesInGroup } from './diningCatalog.js';
+import { displayCourse } from './courseNicknames.js';
+import { titleWithoutCourse } from './assignments.js';
 
 /**
  * Builds the two Today-tab briefs as arrays of segments:
@@ -46,6 +48,17 @@ function joinList(items) {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+/**
+ * True when a location is already named (or clearly implied) by the title —
+ * "NEST Open SkyPark" at "The Nest" reads as a stutter ("... is at 3 PM, The
+ * Nest") once the location is tacked on, so that clause is worth dropping.
+ */
+function locationRedundant(title, location) {
+  if (!title || !location) return false;
+  const core = location.replace(/^\s*the\s+/i, '').trim().toLowerCase();
+  return core.length > 2 && title.toLowerCase().includes(core);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Right now                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -74,8 +87,9 @@ export function composeNowBrief({ profile, assignments = [], events = [], dining
     const upcoming = nextAssignment(assignments, now);
     if (upcoming) {
       seg.push({ text: ' — next up is ' });
-      seg.push({ text: upcoming.title, tab: 'assignments', strong: true });
-      seg.push({ text: ` ${whenPhrase(dateKey(upcoming.due))}.` });
+      seg.push({ text: titleWithoutCourse(upcoming.title), tab: 'assignments', strong: true });
+      const course = upcoming.course ? displayCourse(upcoming.course) : null;
+      seg.push({ text: `${course ? ` for ${course}` : ''} ${whenPhrase(dateKey(upcoming.due))}.` });
     } else {
       seg.push({ text: '.' });
     }
@@ -96,9 +110,10 @@ export function composeNowBrief({ profile, assignments = [], events = [], dining
   if (headline) {
     seg.push({ text: favouriteSport ? ' ' : ' ' });
     seg.push({ text: headline.title, tab: 'events', strong: true });
+    const showLocation = headline.location && !locationRedundant(headline.title, headline.location);
     seg.push({
       text: `${headline.allDay ? ' is on today' : ` is at ${timeLabel(headline.start)}`}${
-        headline.location ? `, ${headline.location}` : ''
+        showLocation ? `, ${headline.location}` : ''
       }`,
     });
     if (upcomingToday.length > 1) {
@@ -249,15 +264,16 @@ export function composeWeekBrief({ profile, assignments = [], events = [] }) {
     seg.push({ text: 'Over the next week you have ' });
     seg.push({ text: plural(upcoming.length, 'assignment', 'assignments'), tab: 'assignments', strong: true });
 
-    const courses = [...new Set(upcoming.map((a) => a.course).filter(Boolean))];
+    const courses = [...new Set(upcoming.map((a) => a.course).filter(Boolean).map(displayCourse))];
     if (courses.length) seg.push({ text: ` across ${joinList(courses.slice(0, 3))}` });
 
     const first = upcoming[0];
     seg.push({
       text: `. The first is `,
     });
-    seg.push({ text: first.title, tab: 'assignments', strong: true });
-    seg.push({ text: `, due ${whenPhrase(dateKey(first.due))}.` });
+    seg.push({ text: titleWithoutCourse(first.title), tab: 'assignments', strong: true });
+    const firstCourse = first.course ? displayCourse(first.course) : null;
+    seg.push({ text: `${firstCourse ? ` for ${firstCourse}` : ''}, due ${whenPhrase(dateKey(first.due))}.` });
   } else {
     seg.push({ text: 'No coursework due in the next week.' });
   }

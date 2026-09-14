@@ -224,7 +224,13 @@ const BACKDROP_MAX_OPACITY = 0.4;
 const CONTENT_MARGIN_PX = 24; // handle + content + this ≈ a "content" detent's natural height
 const VIEWPORT_TOP_GAP_PX = 10; // sliver of background left below the safe area, matching native iOS full presentation
 
-const DEFAULT_DETENTS = [{ key: 'resting', height: 'content' }];
+// Every sheet gets a `full` tier above its natural content height by default,
+// so "drag it all the way to the top" works everywhere out of the box instead
+// of being something each new sheet has to opt into via its own `detents`.
+const DEFAULT_DETENTS = [
+  { key: 'full', height: 'viewport' },
+  { key: 'resting', height: 'content' },
+];
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -326,7 +332,20 @@ function resolveRelease({ resolvedDetents, dismissY, fromIndex, y, velocityPxS }
  * drive the sheet programmatically if it needs to.
  */
 export const Sheet = forwardRef(function Sheet(
-  { open, onClose, title, children, action, detents = DEFAULT_DETENTS, initialDetent, contentKey },
+  {
+    open,
+    onClose,
+    title,
+    children,
+    action,
+    detents = DEFAULT_DETENTS,
+    // Defaults to the shortest (last) configured detent — the sheet always
+    // *opens* at its natural resting size; taller tiers stay reachable by
+    // dragging (or the pointer-only expand button below) rather than shown
+    // up front.
+    initialDetent = detents[detents.length - 1]?.key,
+    contentKey,
+  },
   ref,
 ) {
   const handleRef = useRef(null);
@@ -346,6 +365,9 @@ export const Sheet = forwardRef(function Sheet(
   const [motion, setMotion] = useState({ y: 0, opacity: 0 });
   const enteredRef = useRef(false);
   const detentIndexRef = useRef(0);
+  // Mirrors detentIndexRef, but as state — only read by the expand/collapse
+  // button below, which needs a render when the current tier changes.
+  const [detentIndex, setDetentIndex] = useState(0);
 
   const hasViewportDetent = detents[0]?.height === 'viewport';
 
@@ -420,6 +442,7 @@ export const Sheet = forwardRef(function Sheet(
   function goToDetent(index, velocity) {
     if (!resolvedDetents?.[index]) return;
     detentIndexRef.current = index;
+    setDetentIndex(index);
     if (reducedMotion.current) spring.current.jumpTo(resolvedDetents[index].translateY);
     else spring.current.setTarget(resolvedDetents[index].translateY, { velocity });
   }
@@ -455,6 +478,7 @@ export const Sheet = forwardRef(function Sheet(
       detents.findIndex((d) => d.key === (initialDetent ?? detents[0].key)),
     );
     detentIndexRef.current = startIndex;
+    setDetentIndex(startIndex);
     spring.current.jumpTo(dismissY);
     if (reducedMotion.current) spring.current.jumpTo(resolvedDetents[startIndex].translateY);
     else spring.current.setTarget(resolvedDetents[startIndex].translateY);
@@ -631,7 +655,17 @@ export const Sheet = forwardRef(function Sheet(
   // `fixed inset-0` wrapper, not just the backdrop div — that wrapper covers
   // the whole viewport too and would otherwise still catch the hit-test even
   // with the backdrop itself made non-interactive.
-  const mapPassThrough = motion.opacity < BACKDROP_MAX_OPACITY * 0.15;
+  //
+  // `closing` also passes through immediately, not just once the fade-out
+  // crosses that same opacity threshold: the dismiss animation runs for a
+  // couple hundred ms, and for all of that time this still-mounted overlay
+  // used to sit above whatever was underneath, quietly eating the very next
+  // tap (open a different sheet right after closing this one, on any
+  // platform — the tap that should have opened it did nothing, because it
+  // landed on the old sheet's own backdrop instead). The sheet is on its way
+  // out the moment `closing` flips true, so nothing behind it should have to
+  // wait for the animation to catch up.
+  const passThrough = closing || motion.opacity < BACKDROP_MAX_OPACITY * 0.15;
 
   // Portalled to <body>: the screen's entry animation establishes a containing
   // block, which would otherwise trap this `fixed` overlay inside the scroll area.
@@ -640,7 +674,7 @@ export const Sheet = forwardRef(function Sheet(
       className="fixed inset-0 z-50 flex items-end justify-center"
       role="dialog"
       aria-modal="true"
-      style={{ pointerEvents: mapPassThrough ? 'none' : 'auto' }}
+      style={{ pointerEvents: passThrough ? 'none' : 'auto' }}
     >
       <div
         className={reducedMotion.current ? 'transition-opacity duration-150' : ''}
@@ -677,7 +711,26 @@ export const Sheet = forwardRef(function Sheet(
               <CloseIcon />
             </button>
             <div className="truncate px-2 text-[17px] font-semibold text-label">{title}</div>
-            <div className="min-w-[28px] text-right">{action}</div>
+            <div className="flex min-w-[28px] items-center justify-end gap-2">
+              {resolvedDetents && resolvedDetents.length > 1 && (
+                // Mouse/trackpad users have no drag gesture to reach the other
+                // detents with — a fine pointer gets this button instead, hidden
+                // on touch where the handle drag already does the job.
+                <button
+                  type="button"
+                  onClick={() => goToDetent(detentIndex === 0 ? resolvedDetents.length - 1 : 0)}
+                  aria-label={detentIndex === 0 ? 'Collapse sheet' : 'Expand sheet'}
+                  className="ios-press-scale hidden -m-1 p-1 text-label-2 [@media(pointer:fine)]:inline-flex"
+                >
+                  <ChevronIcon
+                    width={16}
+                    height={16}
+                    style={{ transform: detentIndex === 0 ? 'rotate(90deg)' : 'rotate(-90deg)' }}
+                  />
+                </button>
+              )}
+              {action}
+            </div>
           </div>
         </div>
         <div

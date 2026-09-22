@@ -4,6 +4,41 @@ import { firstSentences } from '../html.js';
 
 const API = 'https://events.umass.edu/api/2/events';
 
+// RecWell's own "Adventure Programs" branch (climbing/SkyPark/hiking/outdoor
+// programming) posts to the same public Localist calendar as every other campus
+// event, duplicating what RecWell's Adventure tab already shows from its own
+// scrape. Checked live: these events carry a "Recreation & Wellbeing" Localist
+// group (id below) plus either the `RecWellAdventurePrograms` hashtag or, for
+// NEST Open SkyPark specifically (posted without that hashtag), the "The Nest"
+// venue — the group id alone is too broad (it also catches unrelated RecWell
+// events like UGLOW), so both checks are required.
+const ADVENTURE_GROUP_ID = 47984712380185;
+const ADVENTURE_HASHTAG = 'RecWellAdventurePrograms';
+const ADVENTURE_LOCATION_FALLBACK = 'The Nest';
+
+function isAdventureProgramEvent(e) {
+  const inGroup = (e.groups || []).some((g) => g.id === ADVENTURE_GROUP_ID);
+  if (!inGroup) return false;
+  return e.hashtag === ADVENTURE_HASHTAG || e.location_name === ADVENTURE_LOCATION_FALLBACK;
+}
+
+async function fetchRawEvents({ days = 21, max = 200 } = {}) {
+  const raw = [];
+  // The API pages at 100/request; two pages is plenty for a three week window.
+  for (let page = 1; page <= Math.ceil(max / 100); page++) {
+    const data = await getOrFetch(`events:localist:${days}:${page}`, TTL.EVENTS, () =>
+      fetchJson(`${API}?days=${days}&pp=100&page=${page}`),
+    );
+    const batch = data?.events || [];
+    for (const wrapper of batch) {
+      if (wrapper?.event) raw.push(wrapper.event);
+    }
+    const total = data?.page?.total ?? 1;
+    if (page >= total || batch.length === 0) break;
+  }
+  return raw;
+}
+
 /**
  * The main UMass events calendar runs on Localist, which exposes a documented
  * public JSON API — no scraping required, and it is the most stable source we have.
@@ -14,23 +49,16 @@ export const localistSource = {
   url: 'https://events.umass.edu/',
 
   async fetchEvents({ days = 21, max = 200 } = {}) {
-    const events = [];
-    // The API pages at 100/request; two pages is plenty for a three week window.
-    for (let page = 1; page <= Math.ceil(max / 100); page++) {
-      const data = await getOrFetch(`events:localist:${days}:${page}`, TTL.EVENTS, () =>
-        fetchJson(`${API}?days=${days}&pp=100&page=${page}`),
-      );
-      const batch = data?.events || [];
-      for (const wrapper of batch) {
-        const e = wrapper?.event;
-        if (e) events.push(normalize(e));
-      }
-      const total = data?.page?.total ?? 1;
-      if (page >= total || batch.length === 0) break;
-    }
-    return events.flat();
+    const raw = await fetchRawEvents({ days, max });
+    return raw.filter((e) => !isAdventureProgramEvent(e)).flatMap(normalize);
   },
 };
+
+/** RecWell's Adventure tab pulls its live event list from this — same source, opposite filter. */
+export async function fetchAdventureProgramEvents({ days = 21, max = 200 } = {}) {
+  const raw = await fetchRawEvents({ days, max });
+  return raw.filter(isAdventureProgramEvent).flatMap(normalize);
+}
 
 function normalize(e) {
   // An event repeats via event_instances; surface each occurrence separately so

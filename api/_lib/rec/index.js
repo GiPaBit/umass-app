@@ -8,6 +8,7 @@ import { getClimbing } from './climbing.js';
 import { getNest } from './nest.js';
 import { getIntramurals } from './intramurals.js';
 import { getClubSports, ENGAGE_CSC_URL } from './clubSports.js';
+import { fetchAdventureProgramEvents } from '../events/localist.js';
 
 const EMPTY_FITNESS = { primer: null, weeks: [], sections: [], url: `${REC_BASE}${REC_PAGES.fitness}`, scheduleUrl: `${REC_BASE}${REC_PAGES.fitnessSchedule}` };
 const EMPTY_AQUATICS = { pools: [], sections: [], url: `${REC_BASE}${REC_PAGES.aquatics}` };
@@ -55,13 +56,14 @@ export async function getRecData() {
     // ignore
   }
 
-  const [fitnessR, aquaticsR, climbingR, nestR, intramuralR, clubSportsR] = await Promise.allSettled([
+  const [fitnessR, aquaticsR, climbingR, nestR, intramuralR, clubSportsR, adventureProgramsR] = await Promise.allSettled([
     getFitness(),
     getAquatics({ facilities, notices }),
     getClimbing(),
     getNest(),
     getIntramurals(),
     getClubSports(),
+    fetchAdventureProgramEvents(),
   ]);
 
   const take = (result, key, fallback, what) => {
@@ -79,6 +81,12 @@ export async function getRecData() {
   const nest = take(nestR, 'nest', EMPTY_NEST, 'NEST');
   const intramural = take(intramuralR, 'intramural', EMPTY_INTRAMURAL, 'Intramurals');
   const clubSports = take(clubSportsR, 'clubSports', EMPTY_CLUBSPORTS, 'Club sports');
+  let programs = [];
+  if (adventureProgramsR.status === 'fulfilled') {
+    programs = adventureProgramsR.value;
+  } else {
+    failures.push({ what: 'Adventure programs', error: String(adventureProgramsR.reason?.message || adventureProgramsR.reason) });
+  }
 
   return {
     ok: true,
@@ -89,7 +97,7 @@ export async function getRecData() {
       notices,
       fitness,
       aquatics,
-      adventure: { climbing, nest },
+      adventure: { climbing, nest, programs },
     },
     sports: {
       intramural,

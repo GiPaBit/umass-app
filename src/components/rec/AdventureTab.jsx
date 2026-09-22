@@ -1,9 +1,10 @@
 import { SectionHeader } from '../ui.jsx';
 import { FaqSection, RecSections } from './FaqSection.jsx';
+import { dayLabel, timeLabel } from '../../lib/dates.js';
 
 /** Climbing has no occupancy indicator by design — no live feed exists and there's no historical data to build even a static histogram from. */
 export function AdventureTab({ data }) {
-  const { climbing, nest } = data.recwell.adventure;
+  const { climbing, nest, programs } = data.recwell.adventure;
 
   return (
     <>
@@ -82,6 +83,32 @@ export function AdventureTab({ data }) {
           published anywhere this app can read.
         </p>
       </div>
+
+      {(programs || []).length > 0 && (
+        <>
+          <SectionHeader>Upcoming Adventure Programs</SectionHeader>
+          <div className="mx-4 overflow-hidden rounded-[16px] bg-card p-4">
+            {programs.map((e) => (
+              <a
+                key={e.id}
+                href={e.url}
+                target="_blank"
+                rel="noreferrer"
+                className="ios-press flex items-center justify-between gap-3 border-b border-separator/50 py-2 last:border-0"
+              >
+                <div>
+                  <div className="text-[14px] font-medium text-ios-blue">{e.title}</div>
+                  {e.location && <div className="text-[12px] text-label-3">{e.location}</div>}
+                </div>
+                <span className="shrink-0 text-right text-[12px] text-label-2">
+                  {dayLabel(e.start)}
+                  {!e.allDay && <> · {timeLabel(e.start)}</>}
+                </span>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
 
       <FaqSection title="Climbing & NEST — More Info">
         <RecSections sections={[...(climbing.sections || []), ...(nest.sections || [])]} />

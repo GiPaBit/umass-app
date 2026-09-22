@@ -47,7 +47,7 @@ export default handleErrors(async (req, res) => {
     }
   });
 
-  items.sort((a, b) => new Date(a.due) - new Date(b.due));
+  items.sort(compareByDue);
 
   sendJson(
     res,
@@ -56,6 +56,32 @@ export default handleErrors(async (req, res) => {
     { cacheSeconds: 0 },
   );
 }, 'Calendar feed');
+
+/**
+ * Assignments due the same Amherst calendar day sort timed ones first, then
+ * all-day ones — an all-day item's `due` is a bare date with no instant
+ * attached, and comparing it as a raw timestamp (`new Date('2026-09-17')` is
+ * UTC midnight, which is *earlier* Eastern-side than any same-day timed
+ * assignment) put every all-day item first in its day instead of last.
+ */
+function compareByDue(a, b) {
+  const dayA = dueDayKey(a.due);
+  const dayB = dueDayKey(b.due);
+  if (dayA !== dayB) return dayA < dayB ? -1 : 1;
+  if (Boolean(a.allDay) !== Boolean(b.allDay)) return a.allDay ? 1 : -1;
+  return new Date(a.due) - new Date(b.due);
+}
+
+/** Amherst calendar day for a due value — a bare date string already is one. */
+function dueDayKey(due) {
+  if (typeof due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(due)) return due;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(due));
+}
 
 async function loadFeed(feed) {
   const url = normaliseFeedUrl(feed.url || '');

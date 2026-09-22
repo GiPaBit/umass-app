@@ -345,6 +345,15 @@ export const Sheet = forwardRef(function Sheet(
     // up front.
     initialDetent = detents[detents.length - 1]?.key,
     contentKey,
+    // Tapping outside closes the sheet by default. The dining map's pin
+    // sheets pass `false`: their backdrop sits over the *whole* map (not
+    // just visually behind the card), so with the default behavior every
+    // tap meant for a *different* pin landed on this sheet's backdrop
+    // instead — closing the current sheet rather than opening the new pin,
+    // which is why switching pins looked like it needed two taps. With
+    // this off, the backdrop still darkens the map but lets taps fall
+    // through to whatever pin is underneath.
+    backdropDismiss = true,
   },
   ref,
 ) {
@@ -360,8 +369,32 @@ export const Sheet = forwardRef(function Sheet(
 
   const [mounted, setMounted] = useState(open);
   const [closing, setClosing] = useState(false);
+  // Mirrors `closing`, but mutated synchronously wherever `closing` is set —
+  // the spring-settle listener below reads this instead of `closing` itself
+  // to avoid a stale-closure race: a fresh open's entrance animation jumps
+  // the spring straight to `dismissY` as its first step (before animating
+  // back up), which the *previous* listener — still subscribed with
+  // whatever `closing` was at the time it last ran, since the effect that
+  // would resubscribe it hasn't fired yet — read as "the close finished,"
+  // closing the sheet right back out from under the content that had just
+  // opened. A ref sidesteps the timing entirely: it's already correct the
+  // instant `closing` changes, regardless of when React gets around to
+  // re-running effects.
+  const closingRef = useRef(false);
   const [containerPx, setContainerPx] = useState(null);
   const [contentPx, setContentPx] = useState(null);
+  // Mirrors `contentPx`, mutated synchronously alongside it — the entrance
+  // effect below reads this instead of the memoized `resolvedDetents` to
+  // avoid a same-render staleness gap: switching straight to different
+  // content (new `contentKey`, `open` staying true throughout) re-measures
+  // and re-enters in the very same render pass, but `resolvedDetents` for
+  // that pass was computed from *last* render's `contentPx` state — setting
+  // state doesn't retroactively fix a value a memo already produced earlier
+  // in the same render. The entrance effect used to commit to that stale
+  // (previous content's) height, animate settled there, and then never
+  // reconsider — the "did content resize?" correction effect only fires
+  // once the spring is at rest, which it wasn't yet.
+  const contentPxRef = useRef(null);
   const [motion, setMotion] = useState({ y: 0, opacity: 0 });
   const enteredRef = useRef(false);
   const detentIndexRef = useRef(0);
@@ -383,18 +416,28 @@ export const Sheet = forwardRef(function Sheet(
   // dismiss (X button, backdrop tap) never animated. Layout effect so a
   // reopen's stale `contentPx` is cleared before the measurement effects
   // below read it, instead of flashing the previous session's size first.
+  //
+  // Also keyed on `contentKey`: swapping straight to a *different* pin while
+  // `open` stays true throughout (e.g. tapping a new map pin mid-dismiss of
+  // the previous one) used to leave `closing` stuck `true` from the old
+  // subject — this effect never re-ran (its only dep, `open`, hadn't
+  // changed), so the in-flight dismiss animation eventually settled and
+  // closed out the *new* pin's sheet instead of the old one. Treating a
+  // `contentKey` change exactly like a fresh open cancels that stale close.
   useLayoutEffect(() => {
     if (open) {
       setMounted(true);
+      closingRef.current = false;
       setClosing(false);
       enteredRef.current = false;
+      contentPxRef.current = null;
       setContentPx(null);
       reducedMotion.current = prefersReducedMotion();
     } else if (mounted && !closing) {
       beginClose(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, contentKey]);
 
   // Measure the "content" detent once per open (or when `contentKey` changes
   // for a genuinely new subject) — never on incidental internal resizes.
@@ -411,7 +454,8 @@ export const Sheet = forwardRef(function Sheet(
     if (!mounted) return;
     const h = handleRef.current?.offsetHeight || 0;
     const c = contentInnerRef.current?.offsetHeight || 0;
-    setContentPx(h + c + CONTENT_MARGIN_PX);
+    contentPxRef.current = h + c + CONTENT_MARGIN_PX;
+    setContentPx(contentPxRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, contentKey]);
 
@@ -448,6 +492,7 @@ export const Sheet = forwardRef(function Sheet(
   }
 
   function beginClose(velocity) {
+    closingRef.current = true;
     setClosing(true);
     const target = dismissY ?? 0;
     // Reduced motion (or closing before the sheet ever finished measuring)
@@ -471,7 +516,14 @@ export const Sheet = forwardRef(function Sheet(
   // sheet open at its tallest detent for a frame before snapping to the
   // configured initial one.
   useLayoutEffect(() => {
-    if (!open || enteredRef.current || !resolvedDetents || dismissY == null) return;
+    if (!open || enteredRef.current || dismissY == null) return;
+    // Resolved fresh from `contentPxRef` rather than trusting the memoized
+    // `resolvedDetents` closed over by this render — see the ref's own
+    // comment for why that memo can still reflect the *previous* subject's
+    // height at exactly this point when switching content while already
+    // open.
+    const freshDetents = resolveDetents(detents, { containerPx, contentPx: contentPxRef.current });
+    if (!freshDetents) return;
     enteredRef.current = true;
     const startIndex = Math.max(
       0,
@@ -480,10 +532,10 @@ export const Sheet = forwardRef(function Sheet(
     detentIndexRef.current = startIndex;
     setDetentIndex(startIndex);
     spring.current.jumpTo(dismissY);
-    if (reducedMotion.current) spring.current.jumpTo(resolvedDetents[startIndex].translateY);
-    else spring.current.setTarget(resolvedDetents[startIndex].translateY);
+    if (reducedMotion.current) spring.current.jumpTo(freshDetents[startIndex].translateY);
+    else spring.current.setTarget(freshDetents[startIndex].translateY);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, resolvedDetents, dismissY]);
+  }, [open, resolvedDetents, dismissY, containerPx]);
 
   // If the content behind the *current* detent genuinely changes size after
   // the initial entrance — the dining map pin sheet swapping to a different
@@ -506,14 +558,14 @@ export const Sheet = forwardRef(function Sheet(
       const ref = dismissY || 1;
       const opacity = BACKDROP_MAX_OPACITY * Math.min(1, Math.max(0, 1 - y / ref));
       setMotion({ y, opacity });
-      if (closing && spring.current.settled) {
+      if (closingRef.current && spring.current.settled) {
         onCloseRef.current?.();
         setMounted(false);
       }
     });
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [closing, dismissY]);
+  }, [dismissY]);
 
   // Auto-promote to the next taller detent if content genuinely outgrows the
   // current one (e.g. the dining map pin's accordion expanding past `medium`)
@@ -666,6 +718,13 @@ export const Sheet = forwardRef(function Sheet(
   // out the moment `closing` flips true, so nothing behind it should have to
   // wait for the animation to catch up.
   const passThrough = closing || motion.opacity < BACKDROP_MAX_OPACITY * 0.15;
+  // Same "none, but the card below re-enables itself" trick `passThrough`
+  // already relies on: with `backdropDismiss` off, the whole wrapper (not
+  // just the backdrop div) has to stop capturing clicks, or the wrapper
+  // itself — still `pointer-events: auto` and still covering the full
+  // screen — would silently absorb the tap in the backdrop's place instead
+  // of letting it reach the map underneath.
+  const wrapperInert = passThrough || !backdropDismiss;
 
   // Portalled to <body>: the screen's entry animation establishes a containing
   // block, which would otherwise trap this `fixed` overlay inside the scroll area.
@@ -674,12 +733,18 @@ export const Sheet = forwardRef(function Sheet(
       className="fixed inset-0 z-50 flex items-end justify-center"
       role="dialog"
       aria-modal="true"
-      style={{ pointerEvents: passThrough ? 'none' : 'auto' }}
+      style={{ pointerEvents: wrapperInert ? 'none' : 'auto' }}
     >
       <div
         className={reducedMotion.current ? 'transition-opacity duration-150' : ''}
-        style={{ position: 'absolute', inset: 0, background: '#000', opacity: motion.opacity }}
-        onClick={onClose}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: '#000',
+          opacity: motion.opacity,
+          pointerEvents: backdropDismiss ? 'auto' : 'none',
+        }}
+        onClick={backdropDismiss ? onClose : undefined}
       />
       <div
         className={`relative flex w-full max-w-[560px] flex-col rounded-t-[var(--radius-sheet)] bg-bg shadow-2xl ${
@@ -692,8 +757,15 @@ export const Sheet = forwardRef(function Sheet(
           opacity: reducedMotion.current ? (closing ? 0 : 1) : 1,
           // Re-enable regardless of the wrapper above — the sheet itself
           // (handle, content, close button) must stay interactive even while
-          // passed-through at `peek`.
-          pointerEvents: 'auto',
+          // passed-through at `peek` — except once `closing`: a sheet that
+          // stays mounted through its own exit animation (anything without
+          // the map's MapPinSheet-style "unmount immediately" early return)
+          // used to keep this card's real screen footprint clickable for the
+          // couple hundred ms it takes to slide away, silently eating a tap
+          // meant for whatever is underneath (e.g. a different map pin) —
+          // the tap that should have landed there did nothing, and the very
+          // next tap, once the card was actually gone, worked fine.
+          pointerEvents: closing ? 'none' : 'auto',
         }}
       >
         <div

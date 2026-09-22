@@ -82,12 +82,15 @@ export const DINING_GROUPS = [
     // sentence) — a fallback for when the live retail-listing scrape doesn't
     // return a description; the live teaser is preferred when present.
     venues: [
-      // Co-located with each other, nudged further from the Blue Wall
-      // coordinate below than their exact real-world spot — close enough on a
-      // stylised map to still merge together, which was making the two pins
-      // hard to tap apart.
-      { name: 'Harvest Market', lat: 42.39219, lon: -72.52652, blurb: 'Grocery-style market on the Campus Center concourse with a global hot bar, salad bar, and grab-and-go options.' },
-      { name: "People's Organic Coffee", lat: 42.39219, lon: -72.52652, blurb: 'Organic coffee, teas, salads, and baked pastries on the Campus Center concourse.' },
+      // Co-located with each other, nudged from the Blue Wall coordinate
+      // below than their exact real-world spot — close enough on a stylised
+      // map to still merge together, which was making the two pins hard to
+      // tap apart. The nudge distance is deliberately modest (~30m, still
+      // comfortably clear of clusterPins' 22m merge radius) — an earlier,
+      // larger nudge pushed this pin off the Campus Center building outline
+      // entirely, onto the walkway beside it.
+      { name: 'Harvest Market', lat: 42.39194, lon: -72.52674, blurb: 'Grocery-style market on the Campus Center concourse with a global hot bar, salad bar, and grab-and-go options.' },
+      { name: "People's Organic Coffee", lat: 42.39194, lon: -72.52674, blurb: 'Organic coffee, teas, salads, and baked pastries on the Campus Center concourse.' },
       // On the top floor of Worcester Commons — shares the hall's coordinate so
       // it clusters into the one Worcester pin along with the café and grab'n go.
       { name: 'The Commonwealth Restaurant', lat: 42.393256, lon: -72.525107, blurb: "Student-run, full-service restaurant on Worcester Commons' top floor with table service and campus views." },
@@ -275,7 +278,18 @@ export function clusterPins(venues, radiusM = 22) {
     }
     const hall = pin.venues.find((v) => v.groupId === 'halls');
     const hasBlueWall = pin.venues.some((v) => v.groupId === 'bluewall');
-    pin.label = hall ? hall.name : hasBlueWall ? 'Blue Wall' : pin.venues[0].name;
+    // Harvest Market + People's Organic Coffee are both on the Campus Center
+    // concourse — labelling their shared pin after the building, same as
+    // Blue Wall's umbrella name above, reads clearer than "Harvest Market"
+    // standing in for the whole spot.
+    const hasCampusCenter = pin.venues.some((v) => v.name === 'Harvest Market');
+    pin.label = hall
+      ? hall.name
+      : hasBlueWall
+        ? 'Blue Wall'
+        : hasCampusCenter
+          ? 'Campus Center'
+          : pin.venues[0].name;
   }
 
   return pins;

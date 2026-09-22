@@ -162,11 +162,19 @@ export const DiningScreen = forwardRef(function DiningScreen(
             onSelectPin={(pin) => {
               // A pin with exactly one venue has nothing to disambiguate —
               // skip straight to its full detail sheet instead of the
-              // accordion-of-venues popup.
+              // accordion-of-venues popup. Each branch clears the *other*
+              // sheet's state, not just sets its own — otherwise tapping a
+              // single-venue pin while a multi-venue pin's sheet was still
+              // open (or mid-close) left both `selectedPin` and
+              // `detailTarget` non-null at once, two independent Sheets
+              // both technically "open".
               if (pin && pin.venues.length === 1) {
+                setSelectedPin(null);
                 setDetailPinId(pin.id);
                 setDetailTarget(resolveTarget(pin.venues[0].name));
               } else {
+                setDetailPinId(null);
+                setDetailTarget(null);
                 setSelectedPin(pin);
               }
             }}
@@ -208,6 +216,7 @@ export const DiningScreen = forwardRef(function DiningScreen(
             setDetailTarget(null);
             setDetailPinId(null);
           }}
+          backdropDismiss={false}
           onViewFullMenu={setMenuHall}
         />
       </div>
@@ -433,6 +442,7 @@ function MapPinSheet({ pin, statusOf, resolveTarget, onClose }) {
       detents={MAP_PIN_DETENTS}
       initialDetent="medium"
       contentKey={pin.id}
+      backdropDismiss={false}
     >
       <ListGroup className="mt-1">
         {pin.venues.map((venue, i) => {
@@ -482,7 +492,7 @@ const VENUE_DETAIL_DETENTS = [
   { key: 'content', height: 'content' },
 ];
 
-function VenueDetailSheet({ target, onClose, onViewFullMenu }) {
+function VenueDetailSheet({ target, onClose, onViewFullMenu, backdropDismiss = true }) {
   const isHall = target?.type === 'hall';
   const name = isHall ? target.hall?.name : target?.venue?.name;
 
@@ -494,6 +504,7 @@ function VenueDetailSheet({ target, onClose, onViewFullMenu }) {
       detents={VENUE_DETAIL_DETENTS}
       initialDetent="content"
       contentKey={name}
+      backdropDismiss={backdropDismiss}
     >
       {target && <VenueDetail target={target} onViewFullMenu={onViewFullMenu} />}
     </Sheet>

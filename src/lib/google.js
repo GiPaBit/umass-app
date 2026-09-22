@@ -1,3 +1,4 @@
+import { dateKey } from './dates.js';
 import { KEYS, read, remove, write } from './storage.js';
 
 /**
@@ -162,7 +163,21 @@ export async function listAssignments(calendarIds, { daysBack = 7, daysAhead = 6
     }),
   );
 
-  return perCalendar.flat().sort((a, b) => new Date(a.due) - new Date(b.due));
+  return perCalendar.flat().sort(compareByDue);
+}
+
+/**
+ * Same-day sort: timed assignments before all-day ones — an all-day item's
+ * `due` (a bare "YYYY-MM-DD") compares as UTC midnight, earlier Eastern-side
+ * than any same-day timed assignment, which put it first rather than last.
+ * Mirrors `api/canvas.js`'s `compareByDue` for the ICS path.
+ */
+function compareByDue(a, b) {
+  const dayA = dateKey(a.due);
+  const dayB = dateKey(b.due);
+  if (dayA !== dayB) return dayA < dayB ? -1 : 1;
+  if (Boolean(a.allDay) !== Boolean(b.allDay)) return a.allDay ? 1 : -1;
+  return new Date(a.due) - new Date(b.due);
 }
 
 function normalize(e, calendarId) {

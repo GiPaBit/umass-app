@@ -28,9 +28,10 @@ export class ErrorBoundary extends Component {
         className="flex h-full flex-col items-center justify-center gap-4 bg-bg px-6 text-center"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <h1 className="text-[22px] font-bold text-label">Something broke</h1>
+        <ConstructionMascot />
+        <h1 className="text-[22px] font-bold text-label">Under Construction</h1>
         <p className="max-w-[36ch] text-[15px] leading-[21px] text-label-2">
-          {error.message || String(error)}
+          The app is undergoing an update at the moment — it'll be working again soon.
         </p>
         <div className="flex gap-2 pt-2">
           <button
@@ -49,7 +50,7 @@ export class ErrorBoundary extends Component {
           </button>
         </div>
         <details className="max-w-full pt-2 text-left">
-          <summary className="cursor-pointer text-[13px] text-label-3">Details</summary>
+          <summary className="cursor-pointer text-[13px] text-label-3">Technical details</summary>
           <pre className="mt-2 max-h-[40vh] overflow-auto rounded-[10px] bg-card p-3 text-[11px] leading-[15px] text-label-2">
             {String(error.stack || error)}
           </pre>
@@ -57,4 +58,25 @@ export class ErrorBoundary extends Component {
       </div>
     );
   }
+}
+
+/**
+ * A little blob pushing a square across a short track until it rounds into a
+ * circle, then the cycle quietly resets — a loading-style loop rather than a
+ * scary crash graphic. Purely decorative; `prefers-reduced-motion` freezes
+ * both pieces in place (see the `.construction-*` rules in index.css).
+ */
+function ConstructionMascot() {
+  return (
+    <div className="relative h-[52px] w-[150px]" aria-hidden="true">
+      <div
+        className="construction-blob absolute bottom-0 left-0 h-9 w-10 bg-ios-blue"
+        style={{ borderRadius: '55% 45% 50% 50% / 60% 55% 45% 40%' }}
+      >
+        <span className="absolute top-[13px] left-[9px] h-[3px] w-[3px] rounded-full bg-white" />
+        <span className="absolute top-[13px] left-[19px] h-[3px] w-[3px] rounded-full bg-white" />
+      </div>
+      <div className="construction-cube absolute bottom-0 left-[46px] h-9 w-9 bg-fill-strong" />
+    </div>
+  );
 }

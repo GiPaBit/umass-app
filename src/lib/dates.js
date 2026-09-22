@@ -112,7 +112,12 @@ export function relativeLabel(date) {
   const abs = Math.abs(diff);
   const mins = Math.round(abs / 60000);
   const hours = Math.round(abs / 3600000);
-  const days = Math.round(abs / 86400000);
+  // Calendar-day diff, not raw hours — two due dates on the same Amherst
+  // calendar day at different times of day must read the same "in Nd"
+  // regardless of what time "now" happens to be. A raw `abs / 86400000`
+  // round used to make e.g. a 10am-Thursday and a 11:59pm-Thursday due date
+  // disagree ("in 3d" vs "in 2d") purely based on the current time of day.
+  const days = Math.abs(Math.round((keyToDate(dateKey(date)) - keyToDate(todayKey())) / 86400000));
 
   if (mins < 1) return 'now';
   const value = mins < 60 ? `${mins}m` : hours < 24 ? `${hours}h` : `${days}d`;

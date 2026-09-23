@@ -106,6 +106,9 @@ export const getEvents = (days = 21) => get(`/api/events?days=${days}`);
 /** RecWell facility hours plus intramural / club sport / fitness info. */
 export const getRec = () => get('/api/rec');
 
+/** Current conditions + short-term forecast for campus, from the NWS API. */
+export const getWeather = () => get('/api/weather');
+
 /**
  * Assignments and events from one or more ICS calendar feeds.
  * POSTed so the feed URLs — which are themselves the credentials — stay out of

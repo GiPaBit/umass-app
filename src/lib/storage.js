@@ -29,6 +29,9 @@ export const KEYS = {
   // but local to this app since Canvas's are themselves only ever browser-local
   // and never appear in the calendar feed.
   courseNicknames: `${PREFIX}course-nicknames`,
+  // { [venueName]: nickname } — shorthand for dining/rec places named in the
+  // Today Brief. Ships pre-seeded with defaults; see venueNicknames.js.
+  venueNicknames: `${PREFIX}venue-nicknames`,
 };
 
 export function read(key, fallback) {
@@ -73,6 +76,7 @@ const CONNECTION_KEYS = [
   // A course rename is a standing preference about a course, not a to-do
   // mark — "clear my data" shouldn't undo it any more than it undoes theme.
   KEYS.courseNicknames,
+  KEYS.venueNicknames,
 ];
 
 export function clearAll({ keepAuth = false } = {}) {

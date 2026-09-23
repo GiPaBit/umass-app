@@ -3,7 +3,7 @@ import { Screen } from '../components/Screen.jsx';
 import { Button, RoundButton, Spinner, StaleNotice } from '../components/ui.jsx';
 import { GearIcon } from '../components/Icons.jsx';
 import { TypedBrief } from '../components/TypedBrief.jsx';
-import { getDiningOverview, getEvents, getRec } from '../lib/api.js';
+import { getDiningOverview, getEvents, getRec, getWeather } from '../lib/api.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useLocalState } from '../hooks/useLocalState.js';
 import { KEYS } from '../lib/storage.js';
@@ -29,6 +29,8 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
   // invalidates the brief's useMemos below instead of leaving the old course
   // name typed out until something else causes a recompute.
   const [courseNicknames] = useLocalState(KEYS.courseNicknames, {});
+  // Same idea, for editing a venue nickname in Settings.
+  const [venueNicknames] = useLocalState(KEYS.venueNicknames, {});
 
   // Once skipped, stay skipped for the rest of the session.
   const [skipped, setSkipped] = useState(false);
@@ -47,12 +49,19 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
   const dining = useAsync(getDiningOverview);
   const rec = useAsync(getRec);
   const events = useAsync(() => getEvents(14));
+  const weather = useAsync(getWeather, [], { enabled: briefPrefs.showWeather !== false });
   const assignments = useAsync(fetchAssignments, [source, JSON.stringify(feeds), calendarIds.join(',')], {
     enabled: source !== SOURCE.none,
   });
 
   const refresh = async () => {
-    await Promise.allSettled([dining.refresh(), rec.refresh(), events.refresh(), assignments.refresh()]);
+    await Promise.allSettled([
+      dining.refresh(),
+      rec.refresh(),
+      events.refresh(),
+      weather.refresh(),
+      assignments.refresh(),
+    ]);
   };
 
   // Ticked-off work drops out of the brief, which is what makes it feel live.
@@ -67,9 +76,9 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
   );
 
   // Wait for the slower sources before typing, so the text does not rewrite itself.
-  const ready = !dining.loading && !rec.loading && !events.loading && !assignments.loading;
+  const ready = !dining.loading && !rec.loading && !events.loading && !weather.loading && !assignments.loading;
 
-  const nowBrief = useMemo(
+  const { segments: nowBrief, nextUpAssignmentId } = useMemo(
     () =>
       composeNowBrief({
         profile,
@@ -77,13 +86,22 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
         events: allEvents,
         dining: dining.data,
         rec: rec.data,
+        weather: weather.data,
+        prefs: briefPrefs,
       }),
-    [profile, openAssignments, allEvents, dining.data, rec.data, courseNicknames],
+    [profile, openAssignments, allEvents, dining.data, rec.data, weather.data, briefPrefs, courseNicknames, venueNicknames],
   );
 
   const weekBriefRaw = useMemo(
-    () => composeWeekBrief({ profile, assignments: openAssignments, events: allEvents }),
-    [profile, openAssignments, allEvents, courseNicknames],
+    () =>
+      composeWeekBrief({
+        profile,
+        assignments: openAssignments,
+        events: allEvents,
+        excludeAssignmentId: nextUpAssignmentId,
+        prefs: briefPrefs,
+      }),
+    [profile, openAssignments, allEvents, courseNicknames, nextUpAssignmentId, briefPrefs],
   );
 
   // Reads as a continuation of the daily brief rather than a new section, once

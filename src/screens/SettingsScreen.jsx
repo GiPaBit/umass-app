@@ -21,6 +21,11 @@ import { FONTS, MODES, THEMES, getAppearance, setAppearance } from '../lib/theme
 import { getProfile, setProfile } from '../lib/profile.js';
 import { DEFAULT_BRIEF_PREFS, setBriefPrefs } from '../lib/briefPrefs.js';
 import { containsBlockedWord } from '../lib/profanityFilter.js';
+import {
+  DEFAULT_VENUE_NICKNAMES,
+  removeVenueNickname,
+  setVenueNickname,
+} from '../lib/venueNicknames.js';
 
 /**
  * Settings is a short menu rather than one long scroll: each area opens as its
@@ -134,6 +139,68 @@ export function SettingsScreen({ open, onClose, onSetupCalendar }) {
             </Row>
           </ListGroup>
 
+          <SectionHeader>Brief Content</SectionHeader>
+          <ListGroup>
+            <Row
+              trailing={
+                <Toggle
+                  checked={briefPrefs.showAssignments !== false}
+                  onChange={(v) => setBriefPrefs({ showAssignments: v })}
+                />
+              }
+            >
+              <div className="text-[17px] text-label">Assignments</div>
+            </Row>
+            <Row
+              trailing={
+                <Toggle
+                  checked={briefPrefs.showEvents !== false}
+                  onChange={(v) => setBriefPrefs({ showEvents: v })}
+                />
+              }
+            >
+              <div className="text-[17px] text-label">Events</div>
+            </Row>
+            {briefPrefs.showEvents !== false && (
+              <Row
+                trailing={
+                  <Toggle
+                    checked={briefPrefs.showSportsEvents !== false}
+                    onChange={(v) => setBriefPrefs({ showSportsEvents: v })}
+                  />
+                }
+              >
+                <div className="text-[17px] text-label">Include sports games</div>
+              </Row>
+            )}
+            <Row
+              trailing={
+                <Toggle
+                  checked={briefPrefs.showWeather !== false}
+                  onChange={(v) => setBriefPrefs({ showWeather: v })}
+                />
+              }
+            >
+              <div className="text-[17px] text-label">Weather</div>
+            </Row>
+            <Row
+              trailing={
+                <Toggle
+                  checked={briefPrefs.useNicknames !== false}
+                  onChange={(v) => setBriefPrefs({ useNicknames: v })}
+                />
+              }
+            >
+              <div className="text-[17px] text-label">Use nicknames</div>
+              <div className="mt-0.5 text-[13px] text-label-2">
+                Shortens place names, like "Worcester" → "Woo".
+              </div>
+            </Row>
+            <Row last onClick={() => setPage('nicknames')}>
+              <div className="text-[17px] text-label">Manage Nicknames</div>
+            </Row>
+          </ListGroup>
+
           <SectionHeader>Other</SectionHeader>
           <ListGroup>
             <Row
@@ -223,6 +290,10 @@ export function SettingsScreen({ open, onClose, onSetupCalendar }) {
 
       <Sheet open={page === 'feedback'} onClose={() => setPage(null)} title="Feedback">
         <FeedbackPage onSent={() => setPage(null)} />
+      </Sheet>
+
+      <Sheet open={page === 'nicknames'} onClose={() => setPage(null)} title="Nicknames">
+        <NicknamesPage />
       </Sheet>
     </>
   );
@@ -493,5 +564,119 @@ function AddFeedSheet({ open, onClose, onSaved }) {
         <CalendarFeedForm key={open ? 'open' : 'closed'} onSaved={onSaved} />
       </div>
     </Sheet>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Preset rows (the defaults venueNicknames.js ships with) plus whatever custom
+ * ones the user has added, same pattern as the Assignments tab's course-name
+ * editor: type in a field, save on blur, blank it to turn that one off.
+ */
+function NicknamesPage() {
+  const [stored] = useLocalState(KEYS.venueNicknames, {});
+  const presetKeys = Object.keys(DEFAULT_VENUE_NICKNAMES);
+  const customKeys = Object.keys(stored).filter((k) => !(k in DEFAULT_VENUE_NICKNAMES));
+  // Freshly-added rows that haven't been given a place name yet — not
+  // persisted until the user actually types one in, so cancelling out of a
+  // blank row leaves nothing behind.
+  const [drafts, setDrafts] = useState([]);
+
+  return (
+    <div className="pb-10">
+      <p className="px-4 pt-3 text-[13px] leading-[18px] text-label-2">
+        Shorten a place name in the Today Brief — it only changes what the brief calls it, not
+        anywhere else in the app. Leave a nickname blank to use the real name again.
+      </p>
+
+      <SectionHeader>Presets</SectionHeader>
+      <ListGroup className="mx-4">
+        {presetKeys.map((key, i) => (
+          <NicknameRow key={key} matchKey={key} last={i === presetKeys.length - 1} />
+        ))}
+      </ListGroup>
+
+      <SectionHeader>Your Own</SectionHeader>
+      <ListGroup className="mx-4">
+        {customKeys.map((key) => (
+          <NicknameRow key={key} matchKey={key} custom last={false} />
+        ))}
+        {drafts.map((id) => (
+          <NicknameRow
+            key={id}
+            matchKey=""
+            custom
+            isDraft
+            last={false}
+            onSaved={() => setDrafts((d) => d.filter((x) => x !== id))}
+          />
+        ))}
+        <Row last onClick={() => setDrafts((d) => [...d, Date.now()])}>
+          <div className="text-[17px] font-medium text-ios-blue">+ Add a place</div>
+        </Row>
+      </ListGroup>
+    </div>
+  );
+}
+
+function NicknameRow({ matchKey, custom = false, isDraft = false, last, onSaved }) {
+  const [stored] = useLocalState(KEYS.venueNicknames, {});
+  const merged = { ...DEFAULT_VENUE_NICKNAMES, ...stored };
+  // Local drafts so typing updates the fields instantly, without a storage
+  // write (and the trim/blank-means-off logic) on every keystroke.
+  const [keyDraft, setKeyDraft] = useState(matchKey);
+  const [valueDraft, setValueDraft] = useState(isDraft ? '' : merged[matchKey] || '');
+
+  useEffect(() => {
+    if (!isDraft) setValueDraft(merged[matchKey] || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stored, matchKey, isDraft]);
+
+  const commit = () => {
+    if (isDraft) {
+      const key = keyDraft.trim();
+      if (!key) return; // nothing typed yet — stays a pending draft row
+      setVenueNickname(key, valueDraft);
+      onSaved?.();
+      return;
+    }
+    setVenueNickname(matchKey, valueDraft);
+  };
+
+  return (
+    <div className={`px-4 py-[9px] ${last ? '' : 'relative ios-separator'}`} style={{ '--sep-inset': '16px' }}>
+      <div className="flex items-center justify-between gap-2">
+        {custom ? (
+          <input
+            type="text"
+            value={keyDraft}
+            onChange={(e) => setKeyDraft(e.target.value)}
+            onBlur={commit}
+            placeholder="Place name, as the brief says it"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-label-2 outline-none placeholder:text-label-3"
+          />
+        ) : (
+          <div className="text-[13px] text-label-2">{matchKey}</div>
+        )}
+        {custom && !isDraft && (
+          <button
+            type="button"
+            onClick={() => removeVenueNickname(matchKey)}
+            className="ios-press-scale shrink-0 text-[13px] text-ios-red"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <input
+        type="text"
+        value={valueDraft}
+        onChange={(e) => setValueDraft(e.target.value)}
+        onBlur={commit}
+        placeholder={matchKey || 'Nickname'}
+        className="mt-0.5 w-full bg-transparent text-[17px] text-label outline-none placeholder:text-label-3"
+      />
+    </div>
   );
 }

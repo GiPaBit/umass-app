@@ -48,4 +48,5 @@ export const TTL = {
   RARE: 12 * 60 * 60 * 1000, // 12h — hall/rec hours-of-operation: changes maybe a few times a semester
   DAILY: 60 * 60 * 1000, // 1h — daily menus / "today's hours" retail listings
   EVENTS: 20 * 60 * 1000, // 20min — campus/sports events, expected near-real-time
+  WEATHER: 30 * 60 * 1000, // 30min — NWS forecast periods update a few times a day
 };

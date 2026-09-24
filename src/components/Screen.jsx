@@ -31,9 +31,12 @@ const SCROLL_TOP_THRESHOLD = 90; // px of scroll before the floating scroll-to-t
  * stops the click from bubbling here), and `scrollTopButton` opts a screen into
  * a built-in floating button, top-right, once scrolled past
  * `SCROLL_TOP_THRESHOLD`.
+ *
+ * `tutorialId` tags the title bar with a `data-tutorial` attribute so
+ * `TutorialOverlay` can spotlight it as one of the guided tour's steps.
  */
 export const Screen = forwardRef(function Screen(
-  { title, titleMenu, children, onRefresh, trailing, subtitle, onScroll, scrollTopButton = false },
+  { title, titleMenu, children, onRefresh, trailing, subtitle, onScroll, scrollTopButton = false, tutorialId },
   ref,
 ) {
   const scrollRef = useRef(null);
@@ -209,6 +212,7 @@ export const Screen = forwardRef(function Screen(
             `titleMenu` stops its own clicks from bubbling here. */}
         <div
           className="sticky top-0 z-10 px-4"
+          data-tutorial={tutorialId}
           onClick={scrollToTop}
           style={{
             paddingTop: `${titleTop + 8}px`,

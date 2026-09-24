@@ -126,9 +126,11 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
       onRefresh={refresh}
       scrollTopButton
       trailing={
-        <RoundButton onClick={onOpenSettings} label="Settings">
-          <GearIcon />
-        </RoundButton>
+        <span data-tutorial="settings-btn" className="inline-flex">
+          <RoundButton onClick={onOpenSettings} label="Settings">
+            <GearIcon />
+          </RoundButton>
+        </span>
       }
     >
       {!ready ? (
@@ -138,7 +140,7 @@ export const TodayScreen = forwardRef(function TodayScreen({ onOpenSettings, onS
         </div>
       ) : (
         <>
-          <div className="fade-up mx-5 mt-4">
+          <div className="fade-up mx-5 mt-4" data-tutorial="brief">
             <TypedBrief
               segments={nowBrief}
               onNavigate={onNavigate}

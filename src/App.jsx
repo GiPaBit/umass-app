@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { TabBar } from './components/TabBar.jsx';
+import { TutorialOverlay } from './components/TutorialOverlay.jsx';
 import { TodayScreen } from './screens/TodayScreen.jsx';
 import { AssignmentsScreen } from './screens/AssignmentsScreen.jsx';
 import { DiningScreen } from './screens/DiningScreen.jsx';
@@ -12,8 +13,9 @@ import { InstallScreen } from './screens/InstallScreen.jsx';
 import { useLocalState } from './hooks/useLocalState.js';
 import { KEYS } from './lib/storage.js';
 import { isToday } from './lib/dates.js';
-import { isOnboarded } from './lib/profile.js';
+import { getProfile, isOnboarded, setProfile } from './lib/profile.js';
 import { isStandalone } from './lib/platform.js';
+import { TUTORIAL_STEPS } from './lib/tutorialSteps.js';
 
 // Flip to true once ready to make the install page a hard gate on every
 // browser visit. Left off for now so "continue in browser" (dismiss-and-
@@ -39,6 +41,34 @@ export default function App() {
   const [diningPinOpen, setDiningPinOpen] = useState(false);
   const tabBarFloating = tab === 'dining' && diningMapActive;
   const tabBarHidden = tabBarFloating && diningPinOpen;
+
+  // Guided tour: runs once automatically right after onboarding, replayable
+  // from Settings. Driving `tab` itself (rather than each step describing a
+  // screen of its own) means it narrates the real, live screens.
+  const [tutorialActive, setTutorialActive] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+
+  const startTutorial = () => {
+    setSettingsOpen(false);
+    setTutorialStep(0);
+    setTutorialActive(true);
+  };
+  const finishTutorial = () => {
+    setTutorialActive(false);
+    setProfile({ tutorialDone: true });
+  };
+
+  // First time the main app is reached with no completed tour on record —
+  // covers both a fresh onboarding and any already-onboarded install picking
+  // up this feature for the first time.
+  useEffect(() => {
+    if (!needsOnboarding && !getProfile().tutorialDone) setTutorialActive(true);
+  }, [needsOnboarding]);
+
+  useEffect(() => {
+    if (tutorialActive) setTab(TUTORIAL_STEPS[tutorialStep]?.tab ?? tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tutorialActive, tutorialStep]);
 
   // Badge the Events tab with anything the user pinned for today.
   const badges = useMemo(
@@ -134,12 +164,26 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onSetupCalendar={openCalendarSetup}
+        onReplayTutorial={startTutorial}
       />
 
       {calendarSetupOpen && (
         <div className="absolute inset-0 z-40 bg-bg">
           <CalendarSetupScreen onDone={() => setCalendarSetupOpen(false)} />
         </div>
+      )}
+
+      {tutorialActive && (
+        <TutorialOverlay
+          steps={TUTORIAL_STEPS}
+          stepIndex={tutorialStep}
+          onNext={() => {
+            if (tutorialStep < TUTORIAL_STEPS.length - 1) setTutorialStep((i) => i + 1);
+            else finishTutorial();
+          }}
+          onBack={() => setTutorialStep((i) => Math.max(0, i - 1))}
+          onSkip={finishTutorial}
+        />
       )}
     </div>
   );

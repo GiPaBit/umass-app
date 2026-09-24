@@ -57,6 +57,7 @@ export const EventsScreen = forwardRef(function EventsScreen(_props, ref) {
     <Screen
       ref={ref}
       title="Events"
+      tutorialId="events-header"
       subtitle={data || quickEvents.length ? `${filtered.length} upcoming` : undefined}
       onRefresh={refresh}
       scrollTopButton

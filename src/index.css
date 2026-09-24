@@ -581,69 +581,161 @@ button,
   animation: ticker-scroll 26s linear infinite;
 }
 
-/* --- Error boundary: blob pushing a cube into a circle, on loop ----------- */
+/* --- Error boundary: blob walking a cube into a circle, on loop ----------- */
+/* One continuous there-and-back trip, nothing ever fades or teleports: push
+   the cube out (0%-45%), a brief arrived pause, then walk it back (50%-100%).
+   Each leg of the trip is only two or three stops, so translateX and
+   border-radius interpolate together — the square rounds out in direct
+   proportion to how far right it's traveled, and un-rounds on the way back.
+   100% lands exactly on 0%, so the loop restart is seamless. */
 @keyframes construction-cube {
-  0%,
-  38% {
+  0% {
     transform: translateX(0);
     border-radius: 8px;
-    opacity: 1;
   }
-  62% {
-    transform: translateX(52px);
+  45% {
+    transform: translateX(56px);
     border-radius: 50%;
-    opacity: 1;
   }
-  70% {
-    transform: translateX(52px);
+  50% {
+    transform: translateX(56px);
     border-radius: 50%;
-    opacity: 0;
   }
-  72% {
-    transform: translateX(0);
-    border-radius: 8px;
-    opacity: 0;
-  }
-  90%,
   100% {
     transform: translateX(0);
     border-radius: 8px;
-    opacity: 1;
   }
 }
 
 @keyframes construction-blob {
-  0%,
-  38% {
+  0% {
     transform: translateX(0) scale(1, 1);
+  }
+  8% {
+    transform: translateX(6px) scale(0.94, 1.06);
+  }
+  16% {
+    transform: translateX(14px) scale(1.05, 0.96);
+  }
+  25% {
+    transform: translateX(22px) scale(0.95, 1.05);
+  }
+  34% {
+    transform: translateX(30px) scale(1.06, 0.94);
+  }
+  45% {
+    transform: translateX(34px) scale(1, 1);
   }
   50% {
-    transform: translateX(24px) scale(1.06, 0.94);
+    transform: translateX(34px) scale(1, 1);
   }
-  62% {
-    transform: translateX(44px) scale(1, 1);
+  58% {
+    transform: translateX(28px) scale(1.05, 0.95);
   }
-  70% {
-    transform: translateX(44px) scale(1, 1);
-    opacity: 0;
+  67% {
+    transform: translateX(20px) scale(0.95, 1.05);
   }
-  72% {
-    transform: translateX(0) scale(1, 1);
-    opacity: 0;
+  76% {
+    transform: translateX(12px) scale(1.05, 0.95);
   }
-  90%,
+  84% {
+    transform: translateX(6px) scale(0.95, 1.05);
+  }
+  92% {
+    transform: translateX(1px) scale(1.02, 0.98);
+  }
   100% {
     transform: translateX(0) scale(1, 1);
-    opacity: 1;
+  }
+}
+
+/* Reaches out and lengthens as the body closes in to make contact, holds
+   through the push, then stays latched on for the walk back and eases off
+   as the body arrives home. */
+@keyframes construction-arm {
+  0% {
+    transform: translateY(-50%) scaleX(0.7) rotate(0deg);
+  }
+  24% {
+    transform: translateY(-50%) scaleX(1.1) rotate(-8deg);
+  }
+  45% {
+    transform: translateY(-50%) scaleX(2.6) rotate(6deg);
+  }
+  50% {
+    transform: translateY(-50%) scaleX(2.4) rotate(0deg);
+  }
+  70% {
+    transform: translateY(-50%) scaleX(1.6) rotate(-4deg);
+  }
+  90% {
+    transform: translateY(-50%) scaleX(0.9) rotate(2deg);
+  }
+  100% {
+    transform: translateY(-50%) scaleX(0.7) rotate(0deg);
+  }
+}
+
+/* A four-beat walk cycle — left, right, left, right — spread across the
+   whole out-and-back trip. */
+@keyframes construction-leg-l {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  10% {
+    transform: translateY(-4px) scaleY(0.8);
+  }
+  20% {
+    transform: translateY(0) scaleY(1);
+  }
+  62% {
+    transform: translateY(-4px) scaleY(0.8);
+  }
+  72% {
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes construction-leg-r {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  30% {
+    transform: translateY(-4px) scaleY(0.8);
+  }
+  40% {
+    transform: translateY(0) scaleY(1);
+  }
+  82% {
+    transform: translateY(-4px) scaleY(0.8);
+  }
+  92% {
+    transform: translateY(0) scaleY(1);
   }
 }
 
 .construction-cube {
-  animation: construction-cube 3.2s var(--ease-ios) infinite;
+  animation: construction-cube 3.4s var(--ease-ios) infinite;
 }
 
 .construction-blob {
-  animation: construction-blob 3.2s var(--ease-ios) infinite;
+  animation: construction-blob 3.4s var(--ease-ios) infinite;
+}
+
+.construction-arm {
+  animation: construction-arm 3.4s var(--ease-ios) infinite;
+}
+
+.construction-leg-l {
+  animation: construction-leg-l 3.4s var(--ease-ios) infinite;
+}
+
+.construction-leg-r {
+  animation: construction-leg-r 3.4s var(--ease-ios) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -664,7 +756,10 @@ button,
     transition: none;
   }
   .construction-cube,
-  .construction-blob {
+  .construction-blob,
+  .construction-arm,
+  .construction-leg-l,
+  .construction-leg-r {
     animation: none;
   }
 }

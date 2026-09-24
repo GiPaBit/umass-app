@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   Badge,
   Button,
@@ -31,7 +31,7 @@ import {
  * Settings is a short menu rather than one long scroll: each area opens as its
  * own page, so nothing competes for attention.
  */
-export function SettingsScreen({ open, onClose, onSetupCalendar }) {
+export function SettingsScreen({ open, onClose, onSetupCalendar, onReplayTutorial }) {
   const [page, setPage] = useState(null);
   const [done, setDone] = useLocalState(KEYS.doneAssignments, {});
   const [quickEvents, setQuickEvents] = useLocalState(KEYS.quickEvents, []);
@@ -208,6 +208,7 @@ export function SettingsScreen({ open, onClose, onSetupCalendar }) {
               subtitle="Report a bug or suggest something"
               onClick={() => setPage('feedback')}
             />
+            <Row title="Replay Tutorial" subtitle="Take the guided tour again" onClick={onReplayTutorial} />
             <Row
               title="Local Data"
               subtitle={`${Object.keys(done).length} completed · ${quickEvents.length} quick-added · ${kb} KB`}
@@ -583,6 +584,16 @@ function NicknamesPage() {
   // blank row leaves nothing behind.
   const [drafts, setDrafts] = useState([]);
 
+  // A nickname only ever shows up if the place it's for would already be
+  // named in the brief (a favourited dining/cafe spot) — so those favourites
+  // double as the exact spelling a new nickname has to match. Offered as
+  // autocomplete rather than making anyone guess/retype the display name.
+  useLocalState(KEYS.profile, null);
+  const profile = getProfile();
+  const suggestionNames = [
+    ...new Set([...(profile.diningFavourites || []), ...(profile.cafeFavourites || [])]),
+  ].filter((name) => !(name in DEFAULT_VENUE_NICKNAMES) && !(name in stored));
+
   return (
     <div className="pb-10">
       <p className="px-4 pt-3 text-[13px] leading-[18px] text-label-2">
@@ -598,6 +609,11 @@ function NicknamesPage() {
       </ListGroup>
 
       <SectionHeader>Your Own</SectionHeader>
+      <p className="px-4 pb-1 text-[12px] leading-[16px] text-label-3">
+        The top field must match one of your favourited dining/cafe spots exactly as it's spelled
+        elsewhere in the app — start typing to pick from those. Tap away from a field (or hit Done
+        on the keyboard) to save it.
+      </p>
       <ListGroup className="mx-4">
         {customKeys.map((key) => (
           <NicknameRow key={key} matchKey={key} custom last={false} />
@@ -609,6 +625,7 @@ function NicknamesPage() {
             custom
             isDraft
             last={false}
+            suggestions={suggestionNames}
             onSaved={() => setDrafts((d) => d.filter((x) => x !== id))}
           />
         ))}
@@ -620,13 +637,14 @@ function NicknamesPage() {
   );
 }
 
-function NicknameRow({ matchKey, custom = false, isDraft = false, last, onSaved }) {
+function NicknameRow({ matchKey, custom = false, isDraft = false, last, suggestions = [], onSaved }) {
   const [stored] = useLocalState(KEYS.venueNicknames, {});
   const merged = { ...DEFAULT_VENUE_NICKNAMES, ...stored };
   // Local drafts so typing updates the fields instantly, without a storage
   // write (and the trim/blank-means-off logic) on every keystroke.
   const [keyDraft, setKeyDraft] = useState(matchKey);
   const [valueDraft, setValueDraft] = useState(isDraft ? '' : merged[matchKey] || '');
+  const suggestionsId = useId();
 
   useEffect(() => {
     if (!isDraft) setValueDraft(merged[matchKey] || '');
@@ -648,14 +666,24 @@ function NicknameRow({ matchKey, custom = false, isDraft = false, last, onSaved 
     <div className={`px-4 py-[9px] ${last ? '' : 'relative ios-separator'}`} style={{ '--sep-inset': '16px' }}>
       <div className="flex items-center justify-between gap-2">
         {custom ? (
-          <input
-            type="text"
-            value={keyDraft}
-            onChange={(e) => setKeyDraft(e.target.value)}
-            onBlur={commit}
-            placeholder="Place name, as the brief says it"
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-label-2 outline-none placeholder:text-label-3"
-          />
+          <>
+            <input
+              type="text"
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              onBlur={commit}
+              placeholder="Place name, as the brief says it"
+              list={isDraft && suggestions.length ? suggestionsId : undefined}
+              className="min-w-0 flex-1 bg-transparent text-[13px] text-label-2 outline-none placeholder:text-label-3"
+            />
+            {isDraft && suggestions.length > 0 && (
+              <datalist id={suggestionsId}>
+                {suggestions.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            )}
+          </>
         ) : (
           <div className="text-[13px] text-label-2">{matchKey}</div>
         )}

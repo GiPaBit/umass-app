@@ -30,6 +30,7 @@ export const RecScreen = forwardRef(function RecScreen(_props, ref) {
     <Screen
       ref={ref}
       titleMenu={{ options: SECTION_OPTIONS, value: section, onChange: setSection }}
+      tutorialId="rec-header"
       subtitle={data ? `${openNow} facilit${openNow === 1 ? 'y' : 'ies'} open` : undefined}
       onRefresh={refresh}
       scrollTopButton

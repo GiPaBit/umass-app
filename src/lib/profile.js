@@ -12,6 +12,9 @@ const DEFAULT_PROFILE = {
   workoutPreferences: [],
   sports: [],
   onboarded: false,
+  // Whether the post-onboarding guided tour (TutorialOverlay) has run —
+  // replayable from Settings, so this never re-gates anything once set.
+  tutorialDone: false,
 };
 
 export function getProfile() {

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Screen } from '../components/Screen.jsx';
 import {
   Button,
@@ -49,6 +49,36 @@ export const DiningScreen = forwardRef(function DiningScreen(
   // multi-venue pins.
   const [detailPinId, setDetailPinId] = useState(null);
   const [menuHall, setMenuHall] = useState(null);
+
+  // Bottom edge of the floating title chip + segmented control, measured
+  // live (rather than a guessed constant) so CampusMap can pan a top-edge
+  // pin (e.g. Snack Overflow) fully clear of it on every device — the
+  // overlay's actual top offset depends on `env(safe-area-inset-top)`,
+  // which varies by device (Dynamic Island vs. plain notch vs. none) and
+  // can't be read from JS, so measuring the rendered element is the only
+  // way to get it right everywhere.
+  const mapWrapRef = useRef(null);
+  const overlayRef = useRef(null);
+  const [topOverlayPx, setTopOverlayPx] = useState(160);
+
+  useLayoutEffect(() => {
+    if (view !== 'map') return undefined;
+    const measure = () => {
+      const overlay = overlayRef.current;
+      const wrap = mapWrapRef.current;
+      if (!overlay || !wrap) return;
+      const bottom = overlay.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top;
+      setTopOverlayPx(Math.ceil(bottom) + 12); // +12px breathing room below the overlay
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (overlayRef.current) ro.observe(overlayRef.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [view, data]);
 
   // Re-renders whenever the profile changes (e.g. pinning from Settings'
   // Favorite Dining picker) so this list's stars stay in sync both ways.
@@ -153,11 +183,12 @@ export const DiningScreen = forwardRef(function DiningScreen(
 
   if (data && view === 'map') {
     return (
-      <div className="relative h-full w-full overflow-hidden bg-bg">
+      <div ref={mapWrapRef} className="relative h-full w-full overflow-hidden bg-bg">
         <div className="absolute inset-0">
           <CampusMap
             venues={ALL_VENUES}
             statusOf={statusOf}
+            topOverlayPx={topOverlayPx}
             selectedPinId={selectedPin?.id || detailPinId}
             onSelectPin={(pin) => {
               // A pin with exactly one venue has nothing to disambiguate —
@@ -190,6 +221,7 @@ export const DiningScreen = forwardRef(function DiningScreen(
         </div>
 
         <div
+          ref={overlayRef}
           className="ios-blur absolute left-4 w-[168px] rounded-[14px] p-1.5 shadow-sm"
           style={{ top: 'calc(env(safe-area-inset-top) + 68px)' }}
         >
@@ -227,6 +259,7 @@ export const DiningScreen = forwardRef(function DiningScreen(
     <Screen
       ref={ref}
       title="Dining"
+      tutorialId="dining-header"
       subtitle={data ? `${openCount} open right now` : undefined}
       onRefresh={refresh}
       scrollTopButton

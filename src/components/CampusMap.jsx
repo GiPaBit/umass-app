@@ -6,11 +6,11 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const DRAG_THRESHOLD = 6; // px of movement before a press counts as a pan rather than a tap
 const PAN_SLACK = 28; // px of pan always available, even at min zoom, so it never feels frozen
-// `DiningScreen` floats a title chip + segmented control on top of the map in
-// roughly this band (safe-area-top + ~10-100px) — extra slack reserved so a
-// pin near the top edge (e.g. Snack Overflow) can still be panned fully clear
-// of that overlay instead of getting stuck underneath it at min zoom.
-const TOP_OVERLAY_SLACK = 110;
+// Fallback used only until `DiningScreen` reports the floating title chip +
+// segmented control's real measured height via `topOverlayPx` (see there for
+// why it's measured rather than a guessed constant — it depends on
+// `env(safe-area-inset-top)`, which differs across devices).
+const DEFAULT_TOP_OVERLAY_SLACK = 160;
 
 /**
  * A stylised campus map drawn from real OpenStreetMap geometry, baked at build
@@ -21,7 +21,13 @@ const TOP_OVERLAY_SLACK = 110;
  * Fills its parent edge-to-edge (parent gives it its size) — the dining map
  * is the only caller, and it's the full-bleed background there.
  */
-export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
+export function CampusMap({
+  venues,
+  statusOf,
+  onSelectPin,
+  selectedPinId,
+  topOverlayPx = DEFAULT_TOP_OVERLAY_SLACK,
+}) {
   const pins = useMemo(() => clusterPins(venues), [venues]);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -91,16 +97,17 @@ export function CampusMap({ venues, statusOf, onSelectPin, selectedPinId }) {
       // Extra downward slack (positive y, pushing content down) so a pin near
       // the very top of the map can clear DiningScreen's fixed header —
       // upward slack (negative y, the bottom edge) is untouched.
-      y: Math.max(-maxY, Math.min(maxY + TOP_OVERLAY_SLACK, candidate.y)),
+      y: Math.max(-maxY, Math.min(maxY + topOverlayPx, candidate.y)),
     };
   };
 
-  // Re-clamp whenever zoom changes (buttons, or a pinch that just ended),
-  // so a big jump never leaves pan out of bounds for the new zoom level.
+  // Re-clamp whenever zoom (or the measured overlay height) changes, so a
+  // big jump — or the overlay resizing, e.g. on rotation — never leaves pan
+  // out of bounds.
   useEffect(() => {
     setPan((p) => clampPan(p, zoom));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom]);
+  }, [zoom, topOverlayPx]);
 
   const startPanGesture = (id) => {
     const p = pointers.current.get(id);

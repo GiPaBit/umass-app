@@ -24,6 +24,7 @@ import {
   dayLabel,
   dayLabelFromKey,
   groupByDay,
+  isOverdue,
   relativeLabel,
   timeLabel,
   todayKey,
@@ -130,7 +131,7 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onSetup
 
   if (source === SOURCE.none) {
     return (
-      <Screen ref={ref} title="Assignments">
+      <Screen ref={ref} title="Assignments" tutorialId="assignments-header">
         <EmptyState
           title="Connect Canvas"
           message="Paste your Canvas calendar feed link — it comes from Canvas → Calendar → “Calendar Feed”. No Google account needed."
@@ -144,6 +145,7 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onSetup
     <Screen
       ref={ref}
       title="Assignments"
+      tutorialId="assignments-header"
       subtitle={`${pending.length} open${completed.length ? ` · ${completed.length} done` : ''}`}
       onRefresh={refresh}
       scrollTopButton
@@ -230,55 +232,102 @@ export const AssignmentsScreen = forwardRef(function AssignmentsScreen({ onSetup
 /* -------------------------------------------------------------------------- */
 
 function AssignmentDetailSheet({ assignment, checked, onToggle, onClose }) {
+  const [canvasOpen, setCanvasOpen] = useState(false);
+
+  // Never leave the frame armed for the next assignment opened.
+  useEffect(() => {
+    if (!assignment) setCanvasOpen(false);
+  }, [assignment]);
+
   if (!assignment) return null;
-  const overdue = !checked && assignment.due && new Date(assignment.due) < new Date();
+  const overdue = !checked && isOverdue(assignment.due);
+  const canvasUrl = assignment.sourceUrl || assignment.url;
 
   return (
-    <Sheet open onClose={onClose} title={displayCourse(assignment.course) || 'Assignment'}>
-      <div className="px-4 pt-4">
-        <h2 className="text-[22px] leading-[28px] font-bold text-label">
-          {titleWithoutCourse(assignment.title)}
-        </h2>
+    <>
+      <Sheet open onClose={onClose} title={displayCourse(assignment.course) || 'Assignment'}>
+        <div className="px-4 pt-4">
+          <h2 className="text-[22px] leading-[28px] font-bold text-label">
+            {titleWithoutCourse(assignment.title)}
+          </h2>
 
-        {assignment.due && (
-          <p className={`mt-1.5 text-[15px] ${overdue ? 'text-ios-red' : 'text-label-2'}`}>
-            Due {dayLabel(assignment.due)}
-            {!assignment.allDay && ` at ${timeLabel(assignment.due)}`} · {relativeLabel(assignment.due)}
-          </p>
-        )}
-
-        {assignment.location && <p className="mt-1 text-[15px] text-label-2">{assignment.location}</p>}
-
-        {assignment.description && (
-          <p className="mt-4 text-[15px] leading-[21px] whitespace-pre-wrap text-label">
-            {assignment.description}
-          </p>
-        )}
-
-        <div className="mt-5 flex flex-col gap-2 pb-6">
-          <Button variant={checked ? 'gray' : 'filled'} onClick={onToggle}>
-            {checked ? 'Mark as not done' : 'Mark as done'}
-          </Button>
-          {(assignment.sourceUrl || assignment.url) && (
-            <a
-              href={assignment.sourceUrl || assignment.url}
-              target="_blank"
-              rel="noreferrer"
-              className="ios-press-scale rounded-[12px] bg-fill px-4 py-[11px] text-center text-[17px] font-medium text-ios-blue"
-            >
-              Open in Canvas
-            </a>
+          {assignment.due && (
+            <p className={`mt-1.5 text-[15px] ${overdue ? 'text-ios-red' : 'text-label-2'}`}>
+              Due {dayLabel(assignment.due)}
+              {!assignment.allDay && ` at ${timeLabel(assignment.due)}`} · {relativeLabel(assignment.due)}
+            </p>
           )}
+
+          {assignment.location && <p className="mt-1 text-[15px] text-label-2">{assignment.location}</p>}
+
+          {assignment.description && (
+            <p className="mt-4 text-[15px] leading-[21px] whitespace-pre-wrap text-label">
+              {assignment.description}
+            </p>
+          )}
+
+          <div className="mt-5 flex flex-col gap-2 pb-6">
+            <Button variant={checked ? 'gray' : 'filled'} onClick={onToggle}>
+              {checked ? 'Mark as not done' : 'Mark as done'}
+            </Button>
+            {canvasUrl && (
+              <button
+                type="button"
+                onClick={() => setCanvasOpen(true)}
+                className="ios-press-scale rounded-[12px] bg-fill px-4 py-[11px] text-center text-[17px] font-medium text-ios-blue"
+              >
+                Open in Canvas
+              </button>
+            )}
+          </div>
         </div>
+      </Sheet>
+
+      {canvasOpen && canvasUrl && (
+        <CanvasFrameModal url={canvasUrl} onClose={() => setCanvasOpen(false)} />
+      )}
+    </>
+  );
+}
+
+/**
+ * Loads the Canvas link inside the app instead of handing off to Safari, so
+ * a session there doesn't mean signing in all over again in a separate
+ * browser tab. Canvas didn't send the usual framing-blocking headers
+ * (X-Frame-Options / CSP frame-ancestors) on the pages this was checked
+ * against, but an iframe's `load` event fires the same whether the page
+ * actually rendered or was silently refused — there's no reliable way to
+ * detect that from here — so "Open in Safari" stays on screen the whole
+ * time as a visible way out, rather than only appearing after a guessed
+ * failure.
+ */
+function CanvasFrameModal({ url, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-bg">
+      <div
+        className="ios-blur flex items-center justify-between gap-3 px-4 pb-2 shadow-sm"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)' }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="ios-press-scale text-[17px] font-medium text-ios-blue"
+        >
+          Done
+        </button>
+        <a href={url} target="_blank" rel="noreferrer" className="ios-press-scale text-[15px] font-medium text-ios-blue">
+          Open in Safari
+        </a>
       </div>
-    </Sheet>
+      <iframe src={url} title="Canvas" className="h-full w-full flex-1 border-0" />
+    </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 
 function AssignmentRow({ assignment, checked, onToggle, onOpen, last }) {
-  const overdue = !checked && assignment.due && new Date(assignment.due) < new Date();
+  const overdue = !checked && isOverdue(assignment.due);
 
   // `struck` mirrors `checked` one commit late. A row that mounts already done
   // starts struck (no replay); ticking one flips it *after* paint, so the CSS

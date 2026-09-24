@@ -94,6 +94,43 @@ export function dayLabelFromKey(key) {
   });
 }
 
+/** UTC offset (e.g. "-04:00") Amherst was at for a given wall-clock instant. */
+function easternOffset(localStamp) {
+  try {
+    const probe = new Date(`${localStamp}Z`);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: TZ,
+      timeZoneName: 'longOffset',
+    }).formatToParts(probe);
+    const name = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT-05:00';
+    const m = /GMT([+-]\d{2}:\d{2})/.exec(name);
+    return m ? m[1] : '-05:00';
+  } catch {
+    return '-05:00';
+  }
+}
+
+/**
+ * The actual instant a due date falls at. A bare "YYYY-MM-DD" (an all-day
+ * assignment with no time of its own, e.g. Canvas's or Google Calendar's
+ * "due this day") isn't due at UTC midnight — `new Date('2026-08-10')` lands
+ * at 8pm Aug 9 in Eastern, hours before the day it's supposedly due even
+ * starts. It's due at the end of that Amherst calendar day, so resolve it to
+ * 11:59:59pm Eastern instead. A timestamped due date is returned untouched.
+ */
+export function dueInstant(date) {
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const offset = easternOffset(`${date}T23:59:59`);
+    return new Date(`${date}T23:59:59${offset}`);
+  }
+  return new Date(date);
+}
+
+/** Whether a due date's instant has already passed. */
+export function isOverdue(date) {
+  return Boolean(date) && dueInstant(date).getTime() < Date.now();
+}
+
 /** "7:00 PM" in Amherst — drops ":00" so it reads like the Calendar app. */
 export function timeLabel(date) {
   if (!date) return '';
@@ -108,7 +145,7 @@ export function timeLabel(date) {
 /** "in 2h", "in 15m", "3d ago" — relative wording for due dates. */
 export function relativeLabel(date) {
   if (!date) return '';
-  const diff = new Date(date).getTime() - Date.now();
+  const diff = dueInstant(date).getTime() - Date.now();
   const abs = Math.abs(diff);
   const mins = Math.round(abs / 60000);
   const hours = Math.round(abs / 3600000);

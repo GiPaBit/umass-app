@@ -61,22 +61,28 @@ export class ErrorBoundary extends Component {
 }
 
 /**
- * A little blob pushing a square across a short track until it rounds into a
- * circle, then the cycle quietly resets — a loading-style loop rather than a
- * scary crash graphic. Purely decorative; `prefers-reduced-motion` freezes
- * both pieces in place (see the `.construction-*` rules in index.css).
+ * A little blob walking a square across a short track, arm out to push it,
+ * legs stepping along the way — the square rounds into a circle in step with
+ * how far it's traveled, then the cycle quietly resets. A loading-style loop
+ * rather than a scary crash graphic. Purely decorative; `prefers-reduced-motion`
+ * freezes every piece in place (see the `.construction-*` rules in index.css).
  */
 function ConstructionMascot() {
   return (
-    <div className="relative h-[52px] w-[150px]" aria-hidden="true">
+    <div className="relative h-[56px] w-[150px]" aria-hidden="true">
       <div
-        className="construction-blob absolute bottom-0 left-0 h-9 w-10 bg-ios-blue"
+        className="construction-blob absolute bottom-1 left-0 h-9 w-10 bg-ios-blue"
         style={{ borderRadius: '55% 45% 50% 50% / 60% 55% 45% 40%' }}
       >
         <span className="absolute top-[13px] left-[9px] h-[3px] w-[3px] rounded-full bg-white" />
         <span className="absolute top-[13px] left-[19px] h-[3px] w-[3px] rounded-full bg-white" />
+        {/* Arm: a short bar off the right shoulder that lengthens as it reaches to push. */}
+        <span className="construction-arm absolute top-[15px] right-[-2px] h-[6px] w-[10px] origin-left rounded-full bg-ios-blue" />
+        {/* Legs: two stubs peeking out the bottom, alternating a small step. */}
+        <span className="construction-leg-l absolute bottom-[-3px] left-[8px] h-[6px] w-[8px] rounded-full bg-ios-blue" />
+        <span className="construction-leg-r absolute bottom-[-3px] left-[22px] h-[6px] w-[8px] rounded-full bg-ios-blue" />
       </div>
-      <div className="construction-cube absolute bottom-0 left-[46px] h-9 w-9 bg-fill-strong" />
+      <div className="construction-cube absolute bottom-1 left-[46px] h-9 w-9 bg-fill-strong" />
     </div>
   );
 }
